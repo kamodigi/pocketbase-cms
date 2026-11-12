@@ -1,4 +1,43 @@
 {
 	"$schema": "https://docs.renovatebot.com/renovate-schema.json",
-	"extends": ["local>kamodigi/renovate-config"]
+	"description": "Copy of the shared kamodigi Renovate preset (a public repository cannot read the private preset). Keep it in sync with the shared preset; add repository-specific rules after the copied ones.",
+	"extends": ["config:recommended"],
+	"timezone": "Asia/Tokyo",
+	"schedule": ["before 9am on monday"],
+	"labels": ["dependencies"],
+	"automerge": false,
+	"nix": { "enabled": true },
+	"lockFileMaintenance": {
+		"enabled": true,
+		"automerge": false,
+		"schedule": ["before 9am on monday"]
+	},
+	"packageRules": [
+		{
+			"description": "Group npm minor and patch updates into one PR",
+			"matchManagers": ["npm"],
+			"matchUpdateTypes": ["minor", "patch"],
+			"groupName": "npm non-major"
+		},
+		{
+			"description": "Group GitHub Actions updates into one PR",
+			"matchManagers": ["github-actions"],
+			"matchDepTypes": ["action"],
+			"groupName": "github-actions"
+		},
+		{
+			"description": "eslint and @eslint/* (js, compat) bump majors together; keep them in one PR, majors included",
+			"matchPackageNames": ["eslint", "@eslint/*"],
+			"groupName": "eslint",
+			"separateMajorMinor": false,
+			"separateMultipleMajor": false
+		},
+		{
+			"description": "@sveltejs/* and vite only build when their versions match; keep them in one PR, majors included",
+			"matchPackageNames": ["@sveltejs/*", "vite"],
+			"groupName": "sveltekit and vite",
+			"separateMajorMinor": false,
+			"separateMultipleMajor": false
+		}
+	]
 }

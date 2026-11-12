@@ -2,7 +2,7 @@
 // Article type: a title, a slug, a rich text body, a cover image and a publish state.
 migrate(
 	app => {
-		const published = '(draft = false && published_at != "" && published_at <= @now)'
+		const published = '(draft = false && (published_at = "" || published_at <= @now))'
 		const editor = '@request.auth.role = "editor"'
 
 		const collection = new Collection({

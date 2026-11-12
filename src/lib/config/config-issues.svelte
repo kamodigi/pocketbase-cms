@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { m } from '#paraglide/messages.js'
+
 	import type { ConfigIssue } from './issues'
 
 	interface Props {
@@ -11,10 +13,7 @@
 
 	let { issues, tone }: Props = $props()
 
-	// Plain English for now; these move to the message catalog with the i18n foundation.
-	const heading = $derived(
-		tone === 'error' ? 'cms.config.json has errors' : 'cms.config.json does not match the PocketBase schema',
-	)
+	const heading = $derived(tone === 'error' ? m.config_issues_errors_heading() : m.config_issues_warnings_heading())
 </script>
 
 {#if issues.length > 0}

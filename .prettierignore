@@ -3,3 +3,4 @@ build
 .svelte-kit
 pnpm-lock.yaml
 /src/paraglide
+project.inlang/cache

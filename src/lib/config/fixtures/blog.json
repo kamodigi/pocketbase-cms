@@ -1,0 +1,93 @@
+{
+	"$schema": "../../../../schema/cms.config.schema.json",
+	"version": 1,
+	"brand": { "name": "Example Studio", "logo": "logo.svg", "accent": "#0a7f99" },
+	"editor": {
+		"features": [
+			"heading",
+			"bold",
+			"italic",
+			"underline",
+			"strike",
+			"link",
+			"bulletList",
+			"orderedList",
+			"blockquote",
+			"horizontalRule",
+			"image",
+			"table",
+			"textColor"
+		],
+		"headingLevels": [2, 3, 4]
+	},
+	"media": {
+		"collection": "media",
+		"fileField": "file",
+		"altField": "alt",
+		"captionField": "caption",
+		"widthField": "width",
+		"heightField": "height",
+		"mimeField": "mime",
+		"compress": { "maxWidth": 1920, "quality": 0.85, "format": "webp" }
+	},
+	"nav": [{ "label": { "en": "Content", "ja": "コンテンツ" }, "items": ["news", "works", "media"] }],
+	"collections": {
+		"news": {
+			"label": { "en": "News", "ja": "お知らせ" },
+			"icon": "newspaper",
+			"titleField": "title",
+			"status": { "draftField": "draft", "publishedAtField": "published_at" },
+			"list": { "columns": ["title", "$status", "published_at"], "sort": "-published_at", "perPage": 20 },
+			"form": { "main": ["title", "content"], "side": ["published_at", "draft", "pinned", "thumbnail"] },
+			"fields": {
+				"title": { "label": "Title" },
+				"content": { "label": "Body" },
+				"thumbnail": { "label": "Thumbnail", "widget": "media" },
+				"published_at": { "label": "Published at", "widget": "datetime", "help": "A future date schedules the post." },
+				"draft": { "label": "Draft" },
+				"pinned": { "label": "Pinned", "badge": "Pinned", "help": "Shown first in lists." },
+				"legacy_id": { "hidden": true }
+			}
+		},
+		"works": {
+			"label": "Works",
+			"icon": "briefcase",
+			"titleField": "title",
+			"status": { "draftField": "draft", "publishedAtField": "published_at" },
+			"list": { "columns": ["title", "category", "$status", "published_at"], "sort": "-published_at", "perPage": 20 },
+			"form": { "main": ["title", "body"], "side": ["published_at", "draft", "category", "link"] },
+			"fields": {
+				"title": { "label": "Title" },
+				"body": { "label": "Body" },
+				"link": { "label": "Link" },
+				"category": {
+					"label": "Category",
+					"widget": "checkboxes",
+					"options": { "print": "Print", "web": { "en": "Web", "ja": "ウェブ" } }
+				},
+				"published_at": { "label": "Published at", "widget": "datetime" },
+				"draft": { "label": "Draft" }
+			}
+		},
+		"media": {
+			"label": "Media",
+			"icon": "image",
+			"titleField": "alt",
+			"list": {
+				"columns": ["file", "alt", "caption", "created"],
+				"sort": "-created",
+				"perPage": 40,
+				"search": ["file", "alt", "caption"]
+			},
+			"fields": {
+				"file": { "label": "Image" },
+				"alt": { "label": "Alt text", "help": "Describe the image briefly for screen readers." },
+				"caption": { "label": "Caption" },
+				"width": { "readonly": true },
+				"height": { "readonly": true },
+				"mime": { "hidden": true },
+				"uploaded_by": { "autofill": "currentUser" }
+			}
+		}
+	}
+}

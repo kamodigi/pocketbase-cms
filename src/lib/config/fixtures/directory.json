@@ -1,0 +1,24 @@
+{
+	"$schema": "../../../../schema/cms.config.schema.json",
+	"version": 1,
+	"brand": { "name": "Example Directory" },
+	"collections": {
+		"shops": {
+			"label": "Shops",
+			"icon": "store",
+			"titleField": "name",
+			"list": {
+				"columns": ["name", "region", "city", "website"],
+				"sort": "region,city,name",
+				"perPage": 100,
+				"search": ["name", "region", "city"]
+			},
+			"fields": {
+				"name": { "label": "Name" },
+				"region": { "label": "Region" },
+				"city": { "label": "City" },
+				"website": { "label": "Website", "help": "A URL starting with http or https." }
+			}
+		}
+	}
+}

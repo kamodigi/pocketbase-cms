@@ -3,8 +3,11 @@ import { sveltekit } from '@sveltejs/kit/vite'
 import { svelteTesting } from '@testing-library/svelte/vite'
 import { defineConfig } from 'vitest/config'
 
+import { configValidator } from './tools/config-validator.ts'
+
 export default defineConfig({
 	plugins: [
+		configValidator(),
 		sveltekit({
 			// The CMS is a static SPA copied into PocketBase's pb_public (e.g. pb_public/cms/).
 			adapter: adapter(),

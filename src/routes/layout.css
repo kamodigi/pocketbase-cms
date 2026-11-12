@@ -1,0 +1,186 @@
+@import 'tailwindcss';
+@import 'tw-animate-css';
+
+@custom-variant dark (&:is(.dark *));
+
+/*
+Design tokens. DESIGN.md explains the two layers:
+1. A raw paper ramp, the only place hex values for surfaces and text live.
+2. Role tokens (--background, --primary, ...) that components use. Never reference the ramp from a component.
+*/
+
+:root {
+	/* Layer 1: the "paper" ramp, light to dark. */
+	--paper-0: #ffffff;
+	--paper-50: #fbfaf7;
+	--paper-100: #f5f3ee;
+	--paper-150: #f3f1ec;
+	--paper-200: #ebe8e1;
+	--paper-300: #e3dfd6;
+	--paper-400: #a39d90;
+	--paper-500: #6b665c;
+	--paper-600: #33302a;
+	--paper-650: #2b2822;
+	--paper-700: #22201b;
+	--paper-750: #1f1d19;
+	--paper-800: #1c1a16;
+	--paper-850: #181713;
+	--paper-900: #151411;
+
+	/*
+	Brand accent. brand.ts overwrites these six at runtime when cms.config.json sets brand.accent.
+	The defaults are what brand.ts computes for the turquoise #0a7f99 (brand.test.ts checks they agree):
+	dark values are lightened for dark paper, and the text values are nudged until links read on every surface.
+	*/
+	--brand: #0a7f99;
+	--brand-fg: #ffffff;
+	--brand-text: #0b6f85;
+	--brand-dark: #3696ab;
+	--brand-dark-fg: #111111;
+	--brand-text-dark: #409baf;
+
+	--radius: 0.25rem;
+
+	/* Layer 2: roles, light. */
+	--background: var(--paper-50);
+	--foreground: var(--paper-750);
+	--card: var(--paper-0);
+	--card-foreground: var(--paper-750);
+	--popover: var(--paper-0);
+	--popover-foreground: var(--paper-750);
+	--primary: var(--brand);
+	--primary-foreground: var(--brand-fg);
+	--secondary: var(--paper-150);
+	--secondary-foreground: var(--paper-750);
+	--muted: var(--paper-150);
+	--muted-foreground: var(--paper-500);
+	--accent: var(--paper-200);
+	--accent-foreground: var(--paper-750);
+	--link: var(--brand-text);
+	--brand-subtle: color-mix(in srgb, var(--paper-0) 88%, var(--brand));
+	--destructive: #b3322a;
+	--success: #2b7048;
+	--success-subtle: #e5f1e8;
+	--warning: #c0820a;
+	--warning-subtle: #fbeedd;
+	--warning-foreground: #8a4f00;
+	--border: var(--paper-300);
+	--input: var(--paper-300);
+	--ring: var(--brand);
+	--sidebar: var(--paper-100);
+	--sidebar-foreground: var(--paper-750);
+	--sidebar-primary: var(--brand);
+	--sidebar-primary-foreground: var(--brand-fg);
+	--sidebar-accent: var(--paper-200);
+	--sidebar-accent-foreground: var(--paper-750);
+	--sidebar-border: var(--paper-300);
+	--sidebar-ring: var(--brand);
+
+	color-scheme: light;
+}
+
+.dark {
+	--background: var(--paper-900);
+	--foreground: var(--paper-200);
+	--card: var(--paper-800);
+	--card-foreground: var(--paper-200);
+	--popover: var(--paper-800);
+	--popover-foreground: var(--paper-200);
+	--primary: var(--brand-dark);
+	--primary-foreground: var(--brand-dark-fg);
+	--secondary: var(--paper-700);
+	--secondary-foreground: var(--paper-200);
+	--muted: var(--paper-700);
+	--muted-foreground: var(--paper-400);
+	--accent: var(--paper-650);
+	--accent-foreground: var(--paper-200);
+	--link: var(--brand-text-dark);
+	--brand-subtle: color-mix(in srgb, var(--paper-800) 78%, var(--brand-dark));
+	--destructive: #f2958c;
+	--success: #7ccf9d;
+	--success-subtle: #1a2e20;
+	--warning: #e8b450;
+	--warning-subtle: #352710;
+	--warning-foreground: #f2bd64;
+	--border: var(--paper-600);
+	--input: var(--paper-600);
+	--ring: var(--brand-dark);
+	--sidebar: var(--paper-850);
+	--sidebar-foreground: var(--paper-200);
+	--sidebar-primary: var(--brand-dark);
+	--sidebar-primary-foreground: var(--brand-dark-fg);
+	--sidebar-accent: var(--paper-650);
+	--sidebar-accent-foreground: var(--paper-200);
+	--sidebar-border: var(--paper-600);
+	--sidebar-ring: var(--brand-dark);
+
+	color-scheme: dark;
+}
+
+@theme inline {
+	--font-sans:
+		'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Noto Sans JP', 'Yu Gothic UI', 'Yu Gothic', system-ui, sans-serif;
+	--font-mono: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+
+	/* One base radius (4px by default) scaled per component size. */
+	--radius-sm: calc(var(--radius) * 0.5);
+	--radius-md: var(--radius);
+	--radius-lg: var(--radius);
+	--radius-xl: calc(var(--radius) * 1.25);
+	--radius-2xl: calc(var(--radius) * 1.5);
+	--radius-3xl: calc(var(--radius) * 2);
+	--radius-4xl: calc(var(--radius) * 2.5);
+
+	--color-background: var(--background);
+	--color-foreground: var(--foreground);
+	--color-card: var(--card);
+	--color-card-foreground: var(--card-foreground);
+	--color-popover: var(--popover);
+	--color-popover-foreground: var(--popover-foreground);
+	--color-primary: var(--primary);
+	--color-primary-foreground: var(--primary-foreground);
+	--color-secondary: var(--secondary);
+	--color-secondary-foreground: var(--secondary-foreground);
+	--color-muted: var(--muted);
+	--color-muted-foreground: var(--muted-foreground);
+	--color-accent: var(--accent);
+	--color-accent-foreground: var(--accent-foreground);
+	--color-link: var(--link);
+	--color-brand-subtle: var(--brand-subtle);
+	--color-destructive: var(--destructive);
+	--color-success: var(--success);
+	--color-success-subtle: var(--success-subtle);
+	--color-warning: var(--warning);
+	--color-warning-subtle: var(--warning-subtle);
+	--color-warning-foreground: var(--warning-foreground);
+	--color-border: var(--border);
+	--color-input: var(--input);
+	--color-ring: var(--ring);
+	--color-sidebar: var(--sidebar);
+	--color-sidebar-foreground: var(--sidebar-foreground);
+	--color-sidebar-primary: var(--sidebar-primary);
+	--color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+	--color-sidebar-accent: var(--sidebar-accent);
+	--color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+	--color-sidebar-border: var(--sidebar-border);
+	--color-sidebar-ring: var(--sidebar-ring);
+}
+
+@layer base {
+	* {
+		@apply border-border outline-ring/50;
+	}
+
+	html {
+		font-size: 16px;
+	}
+
+	body {
+		@apply bg-background text-foreground font-sans;
+		line-height: 1.7;
+	}
+
+	a:not([class]) {
+		@apply text-link underline underline-offset-2;
+	}
+}

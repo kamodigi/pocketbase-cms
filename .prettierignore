@@ -4,3 +4,5 @@ build
 pnpm-lock.yaml
 /src/paraglide
 project.inlang/cache
+src/lib/components/ui
+src/lib/hooks

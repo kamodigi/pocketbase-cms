@@ -3,5 +3,16 @@
 	"home_scaffold_notice": "An admin UI for PocketBase. This build is a scaffold; the editing screens are not implemented yet.",
 	"language_switcher_label": "Language",
 	"config_issues_errors_heading": "cms.config.json has errors",
-	"config_issues_warnings_heading": "cms.config.json does not match the PocketBase schema"
+	"config_issues_warnings_heading": "cms.config.json does not match the PocketBase schema",
+	"theme_toggle_label": "Color theme",
+	"theme_light": "Light",
+	"theme_dark": "Dark",
+	"theme_system": "Follow system",
+	"brand_contrast_heading": "brand.accent in cms.config.json is hard to read",
+	"brand_contrast_button": "Button labels on the accent color are {ratio}:1 in {mode} mode (need {required}:1).",
+	"brand_contrast_ui": "Buttons and focus rings in the accent color are {ratio}:1 against the page in {mode} mode (need {required}:1).",
+	"brand_contrast_hint": "Pick a darker accent for light mode, or a lighter one for dark mode. WCAG 2.2 AA is the target.",
+	"shell_skip_to_content": "Skip to content",
+	"shell_nav_label": "Main navigation",
+	"shell_toggle_navigation": "Toggle navigation"
 }

@@ -33,12 +33,16 @@ export function compileConfigValidator(): string {
 	const body = code.replaceAll(
 		/const (\w+) = require\(("[^"]+")\)\.default;/g,
 		(_, name: string, specifier: string) => {
-			imports.push(`import ${name} from ${specifier};`)
+			// In `vite dev` the pre-bundled CommonJS module arrives as `{ default: fn }` instead of `fn`.
+			imports.push(
+				`import ${name}Module from ${specifier};`,
+				`const ${name} = typeof ${name}Module === 'function' ? ${name}Module : ${name}Module.default;`,
+			)
 			return ''
 		},
 	)
 	if (body.includes('require(')) throw new Error('Unhandled require() in the generated config validator')
-	return imports.join('') + body.replace(/^"use strict";/, '')
+	return imports.join('\n') + '\n' + body.replace(/^"use strict";/, '')
 }
 
 export function configValidator(): Plugin {

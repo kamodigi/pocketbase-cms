@@ -15,13 +15,14 @@
 	"packageManager": "pnpm@12.9.0",
 	"imports": {
 		"#lib": "./src/lib/index.js",
-		"#lib/*": "./src/lib/*"
+		"#lib/*": "./src/lib/*",
+		"#paraglide/*": "./src/paraglide/*"
 	},
 	"scripts": {
 		"dev": "vite dev",
 		"build": "vite build",
 		"preview": "vite preview",
-		"prepare": "svelte-kit sync || echo ''",
+		"prepare": "paraglide-js compile --project ./project.inlang --outdir ./src/paraglide && svelte-kit sync || echo ''",
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
 		"format": "prettier --write .",
@@ -32,6 +33,7 @@
 	"devDependencies": {
 		"@eslint/compat": "^2.1.1",
 		"@eslint/js": "^10.0.1",
+		"@inlang/paraglide-js": "^3.2.2",
 		"@sveltejs/adapter-static": "^4.0.1",
 		"@sveltejs/kit": "^3.0.0",
 		"@sveltejs/load-config": "^0.2.3",

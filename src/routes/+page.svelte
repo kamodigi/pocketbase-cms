@@ -1,5 +1,7 @@
 <script lang="ts">
 	import { appName } from '#lib'
+	import LocaleSwitcher from '#lib/locale-switcher.svelte'
+	import { m } from '#paraglide/messages.js'
 </script>
 
 <svelte:head>
@@ -8,5 +10,6 @@
 
 <main>
 	<h1>{appName}</h1>
-	<p>An admin UI for PocketBase. This build is a scaffold; the editing screens are not implemented yet.</p>
+	<p>{m.home_scaffold_notice()}</p>
+	<LocaleSwitcher />
 </main>

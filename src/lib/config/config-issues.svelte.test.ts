@@ -1,5 +1,7 @@
 import { render, screen } from '@testing-library/svelte'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
+
+import { baseLocale, setLocale } from '#paraglide/runtime.js'
 
 import ConfigIssues from './config-issues.svelte'
 
@@ -9,6 +11,8 @@ const issues = [
 ]
 
 describe('ConfigIssues', () => {
+	afterEach(() => setLocale(baseLocale, { reload: false }))
+
 	it('shows errors as an alert with their paths', () => {
 		render(ConfigIssues, { issues, tone: 'error' })
 
@@ -24,6 +28,13 @@ describe('ConfigIssues', () => {
 		render(ConfigIssues, { issues, tone: 'warning' })
 
 		expect(screen.getByRole('status')).toHaveTextContent('cms.config.json does not match the PocketBase schema')
+	})
+
+	it('shows the headings in Japanese when the locale is ja', () => {
+		setLocale('ja', { reload: false })
+		render(ConfigIssues, { issues, tone: 'error' })
+
+		expect(screen.getByRole('alert')).toHaveTextContent('cms.config.json に誤りがあります')
 	})
 
 	it('renders nothing without issues', () => {

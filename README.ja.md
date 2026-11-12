@@ -54,6 +54,8 @@ pnpm build    # build/ に静的ファイルを書き出す
 
 本物の PocketBase で試すときは、`build/` を `pb_public/cms/` にコピーして `pocketbase serve` を実行します。
 
+画面の文言は `messages/en.json` と `messages/ja.json` にあります（[Paraglide JS](https://inlang.com/m/gerre34r/library-inlang-paraglideJs)）。`src/paraglide/` のコンパイル結果は `pnpm install`、`pnpm dev`、`pnpm build` で生成されます。表示言語は、ユーザーの選択、ブラウザの言語設定、英語の順で決まります。
+
 ## 開発用の PocketBase で試す
 
 `compose.yaml` は、公式バイナリの PocketBase（v0.40.6。正式に対応するのは最新のマイナーバージョンだけ）を、`examples/` のプリセットつきで起動します。Docker Compose が必要です。

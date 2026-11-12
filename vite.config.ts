@@ -1,3 +1,4 @@
+import { paraglideVitePlugin } from '@inlang/paraglide-js'
 import adapter from '@sveltejs/adapter-static'
 import { sveltekit } from '@sveltejs/kit/vite'
 import { svelteTesting } from '@testing-library/svelte/vite'
@@ -28,6 +29,13 @@ export default defineConfig(({ mode }) => {
 				version: { pollInterval: 0 },
 			}),
 			svelteTesting(),
+			paraglideVitePlugin({
+				outdir: './src/paraglide',
+				project: './project.inlang',
+				// The UI language follows the user's choice (kept in localStorage), then the browser's
+				// language setting, then English. It is independent of the content-language tabs.
+				strategy: ['localStorage', 'preferredLanguage', 'baseLocale'],
+			}),
 		],
 		server: {
 			proxy: {

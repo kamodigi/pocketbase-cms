@@ -1,0 +1,40 @@
+{
+	"$schema": "../../../../schema/cms.config.schema.json",
+	"version": 1,
+	"brand": { "name": { "en": "Example Inn", "ja": "サンプル旅館" }, "favicon": "favicon.png" },
+	"locales": ["ja", "en", "zh-Hans"],
+	"nav": [{ "label": { "en": "Pages", "ja": "ページ" }, "items": ["about"] }, { "items": ["events"] }],
+	"collections": {
+		"about": {
+			"label": { "en": "About", "ja": "紹介" },
+			"singleton": true,
+			"fields": {
+				"heading": { "label": "Heading", "localized": true },
+				"body": {
+					"label": "Body",
+					"localized": true,
+					"editor": { "features": ["heading", "bold", "link"], "headingLevels": [2] }
+				}
+			},
+			"previewUrl": "https://inn.example.com/preview"
+		},
+		"events": {
+			"label": "Events",
+			"icon": "calendar",
+			"titleField": "title",
+			"status": { "publishedField": "published", "publishedAtField": "starts_at" },
+			"list": { "columns": ["title", "$status", "starts_at", "updated"], "sort": "-starts_at" },
+			"form": { "main": ["title", "summary"], "side": ["slug", "starts_at", "published", "author"] },
+			"fields": {
+				"title": { "label": "Title", "localized": true },
+				"summary": { "label": "Summary", "localized": true, "widget": "textarea" },
+				"slug": { "widget": "slug", "slugFrom": "title" },
+				"starts_at": { "widget": "date" },
+				"author": { "widget": "relation", "displayField": "name", "readonly": true },
+				"published": { "label": "Published" },
+				"created_at": { "autofill": "now", "hidden": true }
+			},
+			"previewUrl": "https://inn.example.com/events/preview"
+		}
+	}
+}

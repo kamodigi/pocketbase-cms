@@ -1,0 +1,226 @@
+{
+	"$schema": "https://json-schema.org/draft/2020-12/schema",
+	"$id": "https://raw.githubusercontent.com/kamodigi/pocketbase-cms/main/schema/cms.config.schema.json",
+	"title": "pocketbase-cms config",
+	"description": "Presentation overlay for pocketbase-cms. Field types come from the PocketBase schema (GET /api/cms/schema); this file only says how to show them. It is served publicly from pb_public, so never put secrets here.",
+	"type": "object",
+	"additionalProperties": false,
+	"required": ["version", "collections"],
+	"properties": {
+		"$schema": { "type": "string" },
+		"version": { "const": 1 },
+		"brand": {
+			"type": "object",
+			"additionalProperties": false,
+			"properties": {
+				"name": { "$ref": "#/$defs/label" },
+				"logo": { "type": "string", "description": "Path relative to /cms/ or an absolute URL." },
+				"favicon": { "type": "string" },
+				"accent": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$" }
+			}
+		},
+		"locales": {
+			"description": "Content locales for localized fields. The first one is the base locale. Omit for single-language sites.",
+			"type": "array",
+			"minItems": 1,
+			"uniqueItems": true,
+			"items": { "type": "string", "pattern": "^[a-z]{2,3}(-[A-Za-z0-9]{2,8})*$" }
+		},
+		"editor": { "$ref": "#/$defs/editor" },
+		"media": {
+			"description": "Marks one collection as the media library. Image fields with widget \"media\" pick from it, and the rich text editor inserts images from it.",
+			"type": "object",
+			"additionalProperties": false,
+			"required": ["collection", "fileField"],
+			"properties": {
+				"collection": { "type": "string" },
+				"fileField": { "type": "string" },
+				"altField": { "type": "string" },
+				"captionField": { "type": "string" },
+				"widthField": { "type": "string" },
+				"heightField": { "type": "string" },
+				"mimeField": { "type": "string" },
+				"compress": { "$ref": "#/$defs/compress" }
+			}
+		},
+		"nav": {
+			"description": "Sidebar groups. Collections not listed here are appended to the last group.",
+			"type": "array",
+			"items": {
+				"type": "object",
+				"additionalProperties": false,
+				"required": ["items"],
+				"properties": {
+					"label": { "$ref": "#/$defs/label" },
+					"items": { "type": "array", "items": { "type": "string" }, "minItems": 1 }
+				}
+			}
+		},
+		"collections": {
+			"description": "Only collections listed here appear in the CMS. Keys are PocketBase collection names.",
+			"type": "object",
+			"minProperties": 1,
+			"additionalProperties": { "$ref": "#/$defs/collection" }
+		}
+	},
+	"$defs": {
+		"label": {
+			"description": "A plain string, or one string per UI locale.",
+			"oneOf": [
+				{ "type": "string", "minLength": 1 },
+				{ "type": "object", "minProperties": 1, "additionalProperties": { "type": "string", "minLength": 1 } }
+			]
+		},
+		"compress": {
+			"type": "object",
+			"additionalProperties": false,
+			"properties": {
+				"maxWidth": { "type": "integer", "minimum": 320 },
+				"quality": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 },
+				"format": { "enum": ["webp", "jpeg", "keep"] }
+			}
+		},
+		"editor": {
+			"type": "object",
+			"additionalProperties": false,
+			"properties": {
+				"features": {
+					"type": "array",
+					"uniqueItems": true,
+					"items": {
+						"enum": [
+							"heading",
+							"bold",
+							"italic",
+							"underline",
+							"strike",
+							"code",
+							"link",
+							"bulletList",
+							"orderedList",
+							"blockquote",
+							"codeBlock",
+							"horizontalRule",
+							"image",
+							"table",
+							"textColor",
+							"textAlign"
+						]
+					}
+				},
+				"headingLevels": { "type": "array", "items": { "enum": [1, 2, 3, 4, 5, 6] }, "uniqueItems": true }
+			}
+		},
+		"collection": {
+			"type": "object",
+			"additionalProperties": false,
+			"properties": {
+				"label": { "$ref": "#/$defs/label" },
+				"icon": { "type": "string", "description": "Lucide icon name, e.g. \"newspaper\"." },
+				"singleton": { "type": "boolean", "description": "Exactly one record; the list screen is skipped." },
+				"titleField": {
+					"type": "string",
+					"description": "Field used as the record's name in lists, breadcrumbs and relation pickers. Defaults to the first text field."
+				},
+				"status": {
+					"description": "Derives Draft / Scheduled / Published from existing fields. A record is Draft when draftField is true (or publishedField is false), Scheduled when publishedAtField is in the future, otherwise Published.",
+					"type": "object",
+					"additionalProperties": false,
+					"properties": {
+						"draftField": { "type": "string" },
+						"publishedField": { "type": "string" },
+						"publishedAtField": { "type": "string" }
+					},
+					"oneOf": [{ "required": ["draftField"] }, { "required": ["publishedField"] }]
+				},
+				"list": {
+					"type": "object",
+					"additionalProperties": false,
+					"properties": {
+						"columns": {
+							"type": "array",
+							"items": { "type": "string" },
+							"minItems": 1,
+							"description": "Field names, plus the virtual column \"$status\"."
+						},
+						"sort": { "type": "string", "description": "PocketBase sort expression, e.g. \"-published_at\"." },
+						"perPage": { "type": "integer", "minimum": 1, "maximum": 200 },
+						"search": {
+							"type": "array",
+							"items": { "type": "string" },
+							"minItems": 1,
+							"description": "Fields matched by the search box. Defaults to [titleField]."
+						}
+					}
+				},
+				"form": {
+					"description": "Field placement on the edit screen. Fields in the schema but not placed here go to the end of main, unless hidden.",
+					"type": "object",
+					"additionalProperties": false,
+					"properties": {
+						"main": { "type": "array", "items": { "type": "string" } },
+						"side": { "type": "array", "items": { "type": "string" } }
+					}
+				},
+				"fields": {
+					"type": "object",
+					"additionalProperties": { "$ref": "#/$defs/field" }
+				},
+				"previewUrl": {
+					"type": "string",
+					"format": "uri",
+					"description": "Site page that receives collection, id, token (and locale) by form POST."
+				}
+			}
+		},
+		"field": {
+			"type": "object",
+			"additionalProperties": false,
+			"properties": {
+				"label": { "$ref": "#/$defs/label" },
+				"help": { "$ref": "#/$defs/label" },
+				"hidden": { "type": "boolean" },
+				"readonly": { "type": "boolean" },
+				"widget": {
+					"description": "Overrides the input chosen from the PocketBase field type.",
+					"enum": [
+						"text",
+						"textarea",
+						"slug",
+						"richtext",
+						"number",
+						"toggle",
+						"date",
+						"datetime",
+						"url",
+						"select",
+						"checkboxes",
+						"relation",
+						"media",
+						"file"
+					]
+				},
+				"options": {
+					"description": "Display labels for select values, keyed by the stored value.",
+					"type": "object",
+					"additionalProperties": { "$ref": "#/$defs/label" }
+				},
+				"displayField": {
+					"type": "string",
+					"description": "For relation fields: the field of the related record to show."
+				},
+				"slugFrom": { "type": "string", "description": "For slug fields: suggest a slug from this field when empty." },
+				"autofill": {
+					"description": "Filled by the CMS when a record is created, and not shown as an input.",
+					"enum": ["currentUser", "now"]
+				},
+				"localized": {
+					"type": "boolean",
+					"description": "Groups <name>_<locale> fields into one input with locale tabs."
+				},
+				"editor": { "$ref": "#/$defs/editor" },
+				"badge": { "$ref": "#/$defs/label", "description": "For bool fields: shown as a badge in the list when true." }
+			}
+		}
+	}
+}

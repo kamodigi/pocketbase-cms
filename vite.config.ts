@@ -4,12 +4,15 @@ import { svelteTesting } from '@testing-library/svelte/vite'
 import { loadEnv } from 'vite'
 import { defineConfig } from 'vitest/config'
 
+import { configValidator } from './tools/config-validator.ts'
+
 export default defineConfig(({ mode }) => {
 	// The PocketBase from `docker compose up` (see README.md). Same-origin in production, so proxy in dev.
 	const pocketbase = loadEnv(mode, '.', '').POCKETBASE_URL || 'http://127.0.0.1:8090'
 
 	return {
 		plugins: [
+			configValidator(),
 			sveltekit({
 				// The CMS is a static SPA copied into PocketBase's pb_public (e.g. pb_public/cms/).
 				adapter: adapter(),

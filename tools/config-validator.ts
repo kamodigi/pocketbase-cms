@@ -5,8 +5,6 @@ import type { Plugin } from 'vite'
 import Ajv2020 from 'ajv/dist/2020.js'
 import standaloneCode from 'ajv/dist/standalone/index.js'
 import { readFileSync } from 'node:fs'
-import { readFile } from 'node:fs/promises'
-import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const schemaPath = fileURLToPath(new URL('../schema/cms.config.schema.json', import.meta.url))
@@ -43,27 +41,8 @@ export function compileConfigValidator(): string {
 	return imports.join('') + body.replace(/^"use strict";/, '')
 }
 
-/**
-Also, during `pnpm dev`, serves the file named by the CMS_CONFIG environment variable at
-/cms/config.json, so you can try a config without copying it into the app.
-*/
 export function configValidator(): Plugin {
 	return {
-		configureServer(server) {
-			const configPath = process.env.CMS_CONFIG
-			if (!configPath) return
-			server.middlewares.use('/cms/config.json', async (_request, response) => {
-				try {
-					const body = await readFile(path.resolve(configPath), 'utf8')
-					response.setHeader('Content-Type', 'application/json')
-					response.end(body)
-				} catch (error) {
-					server.config.logger.error(`CMS_CONFIG: cannot read ${path.resolve(configPath)}: ${String(error)}`)
-					response.statusCode = 500
-					response.end()
-				}
-			})
-		},
 		load(id) {
 			if (id !== resolvedId) return
 			// Rollup plugin hooks get their context as `this`.

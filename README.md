@@ -52,9 +52,36 @@ pnpm test     # unit tests
 pnpm build    # static build in build/
 ```
 
-`pnpm dev` serves the file named by the `CMS_CONFIG` environment variable as `/cms/config.json`, e.g. `CMS_CONFIG=path/to/cms.config.json pnpm dev`.
-
 To try the build with a real PocketBase, copy `build/` to `pb_public/cms/` and run `pocketbase serve`.
+
+## Try it with a development PocketBase
+
+A `compose.yaml` runs the official PocketBase binary (v0.40.6; only the latest minor version is supported) with the example presets in `examples/`. It needs Docker Compose.
+
+```sh
+docker compose up -d --build   # PocketBase at http://localhost:8090
+pnpm install
+pnpm dev                       # CMS at http://localhost:5173/cms/
+```
+
+Sign in at the CMS with `editor@example.com` / `password1234`. The PocketBase dashboard at <http://localhost:8090/_/> takes `admin@example.com` / `password1234`. These accounts come from `dev/pb_migrations/` and exist for local development only.
+
+`pnpm dev` proxies `/api` and `/cms/config.json` to PocketBase (set `POCKETBASE_URL` to use another address). Data lives in a Docker volume; `docker compose down -v` deletes it, and the next `up` starts from the presets again. Migrations are copied in when the container starts, so run `docker compose restart` after editing them.
+
+### Presets
+
+`examples/lantern-coffee/` describes a fictional coffee roaster. Each preset directory holds its migrations and a `cms.config.json`. Copy what you need into your own site.
+
+| Collection | Type        | Notes                                                                                   |
+| ---------- | ----------- | --------------------------------------------------------------------------------------- |
+| `posts`    | Article     | Title, slug, rich text body, cover image, category, draft flag and publish date         |
+| `stores`   | List        | Flat records with a select field and a URL                                              |
+| `about`    | Single page | One record, created by the migration; editors can update it but not create or delete it |
+| `media`    | Media       | Image file, required alt text, caption, width and height                                |
+
+- `examples/lantern-coffee/pb_migrations/` holds the JavaScript migrations, including `users.role`. Put them in your PocketBase's `pb_migrations/`.
+- `examples/lantern-coffee/cms.config.json` is the matching config. Copy it to `pb_public/cms/config.json`.
+- Every collection has `created` and `updated` (autodate) fields. Collections made by migrations don't get them automatically.
 
 ## License
 

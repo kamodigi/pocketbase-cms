@@ -52,9 +52,36 @@ pnpm test     # ユニットテスト
 pnpm build    # build/ に静的ファイルを書き出す
 ```
 
-`pnpm dev` では、環境変数 `CMS_CONFIG` で指定したファイルを `/cms/config.json` として配信します（例：`CMS_CONFIG=path/to/cms.config.json pnpm dev`）。
-
 本物の PocketBase で試すときは、`build/` を `pb_public/cms/` にコピーして `pocketbase serve` を実行します。
+
+## 開発用の PocketBase で試す
+
+`compose.yaml` は、公式バイナリの PocketBase（v0.40.6。正式に対応するのは最新のマイナーバージョンだけ）を、`examples/` のプリセットつきで起動します。Docker Compose が必要です。
+
+```sh
+docker compose up -d --build   # PocketBase: http://localhost:8090
+pnpm install
+pnpm dev                       # CMS: http://localhost:5173/cms/
+```
+
+CMS には `editor@example.com` / `password1234` でログインします。PocketBase のダッシュボード <http://localhost:8090/_/> には `admin@example.com` / `password1234` で入れます。これらのアカウントは `dev/pb_migrations/` が作るもので、ローカルの開発専用です。
+
+`pnpm dev` は `/api` と `/cms/config.json` を PocketBase に中継します（別のアドレスを使うときは `POCKETBASE_URL` を設定します）。データは Docker のボリュームに入り、`docker compose down -v` で消えます。次の `up` でプリセットから作り直されます。マイグレーションはコンテナの起動時にコピーされるので、編集したら `docker compose restart` してください。
+
+### プリセット
+
+`examples/lantern-coffee/` は、架空のコーヒー焙煎所のサイトです。各プリセットのディレクトリに、マイグレーションと `cms.config.json` があります。必要なものを自分のサイトにコピーして使います。
+
+| コレクション | 型           | 内容                                                                                  |
+| ------------ | ------------ | ------------------------------------------------------------------------------------- |
+| `posts`      | 記事型       | タイトル、スラッグ、リッチテキストの本文、カバー画像、カテゴリ、下書きと公開日        |
+| `stores`     | 一覧型       | 選択項目と URL を持つ、並列のレコード                                                 |
+| `about`      | 単一ページ型 | レコードは1件だけ。マイグレーションで作り、編集者は更新だけできる（作成・削除は不可） |
+| `media`      | メディア     | 画像ファイル、必須の代替テキスト、キャプション、幅と高さ                              |
+
+- `examples/lantern-coffee/pb_migrations/` に JavaScript のマイグレーションがあります（`users.role` も含みます）。自分の PocketBase の `pb_migrations/` に置きます。
+- `examples/lantern-coffee/cms.config.json` が対応する設定ファイルです。`pb_public/cms/config.json` にコピーします。
+- どのコレクションにも `created` と `updated`（autodate 型）があります。マイグレーションで作ったコレクションには自動では付かないためです。
 
 ## ライセンス
 

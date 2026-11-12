@@ -1,0 +1,21 @@
+# Development PocketBase with the example presets. See "Development" in README.md.
+services:
+  pocketbase:
+    build:
+      context: dev
+      args:
+        # Keep in sync with the PocketBase version named in README.md.
+        PB_VERSION: 0.40.6
+    ports:
+      - '127.0.0.1:8090:8090'
+    volumes:
+      - pb_data:/pb/pb_data
+      # The example collections, and a dev-only migration that creates a superuser and an editor.
+      # The entrypoint merges both into pb_migrations.
+      - ./examples/lantern-coffee/pb_migrations:/migrations/examples:ro
+      - ./dev/pb_migrations:/migrations/dev:ro
+      # Served at http://localhost:8090/cms/config.json, like the config in a real site.
+      - ./examples/lantern-coffee/cms.config.json:/pb/pb_public/cms/config.json:ro
+
+volumes:
+  pb_data:

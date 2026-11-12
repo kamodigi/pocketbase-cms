@@ -96,13 +96,23 @@ describe('sanitizeHtml', () => {
 		expect(sanitizeHtml('<p style="text-align: right; position: fixed; top: 0">x</p>')).toBe(
 			'<p style="text-align: right">x</p>',
 		)
-		expect(sanitizeHtml('<span style="color: rgb(1, 2, 3); background-color: rgba(0 0 0 / 50%)">x</span>')).toBe(
-			'<span style="color: rgb(1, 2, 3); background-color: rgba(0 0 0 / 50%)">x</span>',
+		// Spaces are normalized: none around "(", ")", "," and "/".
+		expect(sanitizeHtml('<span style="color: rgb( 1, 2 ,3 ); background-color: rgba(0 0  0 / 50%)">x</span>')).toBe(
+			'<span style="color: rgb(1,2,3); background-color: rgba(0 0 0/50%)">x</span>',
+		)
+		expect(sanitizeHtml('<span style="color: hsl(120deg 50% 25%)">x</span>')).toBe(
+			'<span style="color: hsl(120deg 50% 25%)">x</span>',
 		)
 		expect(sanitizeHtml('<span style="background-color: url(https://evil.example/t.png)">x</span>')).toBe(
 			'<span>x</span>',
 		)
 		expect(sanitizeHtml('<span style="color: expression(alert(1))">x</span>')).toBe('<span>x</span>')
+	})
+
+	test('caps the length of numbers and styles', () => {
+		expect(sanitizeHtml('<td colspan="12345" width="1234567" style="min-width: 1234567px">x</td>')).toBe('<td>x</td>')
+		expect(sanitizeHtml(`<p style="color: ${'a'.repeat(31)}">x</p>`)).toBe('<p>x</p>')
+		expect(sanitizeHtml(`<p style="text-align: center;${' '.repeat(1000)}">x</p>`)).toBe('<p>x</p>')
 	})
 
 	test('checks attribute values', () => {
@@ -119,6 +129,13 @@ describe('sanitizeHtml', () => {
 		expect(sanitizeHtml('<a href="/" rel="opener">x</a>')).toBe('<a href="/">x</a>')
 	})
 
+	test('adds noopener whenever there is a target', () => {
+		expect(sanitizeHtml('<a href="/" target="preview">x</a>')).toBe('<a href="/" target="preview" rel="noopener">x</a>')
+		expect(sanitizeHtml('<a rel="nofollow" href="/" target="_blank">x</a>')).toBe(
+			'<a rel="nofollow noopener" href="/" target="_blank">x</a>',
+		)
+	})
+
 	test('flattens very deep nesting', () => {
 		const output = sanitizeHtml('<div>'.repeat(150) + 'x' + '</div>'.repeat(150))
 		expect(output).toBe('<div>'.repeat(100) + 'x' + '</div>'.repeat(100))
@@ -128,6 +145,9 @@ describe('sanitizeHtml', () => {
 		const started = performance.now()
 		sanitizeHtml('<xmp></xmp>'.repeat(100_000))
 		sanitizeHtml('<div>'.repeat(100_000) + '</span>'.repeat(100_000))
+		sanitizeHtml(`<p style="color: rgb(1${' '.repeat(1_000_000)}x">x</p>`)
+		sanitizeHtml(`<p style="${'color: rgb(1;'.repeat(50_000)}">x</p>`)
+		sanitizeHtml(`<p class="${'a'.repeat(1_000_000)}!" title="${'&a'.repeat(500_000)}">x</p>`)
 		expect(performance.now() - started).toBeLessThan(2000)
 	})
 
@@ -222,10 +242,22 @@ describe('rewriteMediaSrc', () => {
 		)
 	})
 
-	test('leaves images without data-media-id, or with an unknown id, as they are', () => {
-		const input = '<img src=\'plain.png\' alt=b><img src="old.png" data-media-id="zz"><p data-media-id=\'a1\'>t</p>'
+	test('leaves images without data-media-id, and other tags, as they are', () => {
+		const input = "<img src='plain.png' alt=b><p data-media-id='a1'>t</p>"
 		expect(rewriteMediaSrc(input, urls)).toBe(input)
 		expect(rewriteMediaSrc('', urls)).toBe('')
+	})
+
+	test('removes the src of images whose id is not in the map', () => {
+		expect(rewriteMediaSrc('<img src="old.png" alt="A" data-media-id="zz">', urls)).toBe(
+			'<img alt="A" data-media-id="zz">',
+		)
+	})
+
+	test('rebuilds only well-formed attribute names', () => {
+		expect(rewriteMediaSrc('<img data-media-id="a1" "x=1 data-ok="y">', urls)).toBe(
+			'<img src="https://pb.example.com/api/files/col_media/a1/new.webp" data-media-id="a1" data-ok="y">',
+		)
 	})
 
 	test('escapes the URL', () => {

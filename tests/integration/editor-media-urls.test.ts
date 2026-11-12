@@ -7,13 +7,14 @@ import { anonymous, asEditor, asSuperuser, mediaForm, uniqueId } from './clients
 
 // hooks/pb_hooks/pbcms_media_urls.pb.js: API responses point <img data-media-id> at the media
 // record's current file. These tests change settings and rules, so they get their own PocketBase.
+// Its test-only raw-write.pb.js reads the stored value, which responses never show.
 describe('images in editor fields', () => {
 	let server: PocketBaseServer
 	let editor: PocketBase
 	let admin: PocketBase
 
 	beforeAll(async () => {
-		server = await startPocketBase()
+		server = await startPocketBase({ hooks: { 'raw-write.pb.js': 'tests/integration/fixtures/raw-write.pb.js' } })
 		editor = await asEditor(server.url)
 		admin = await asSuperuser(server.url)
 	})
@@ -54,25 +55,40 @@ describe('images in editor fields', () => {
 		expect(list[0].body).toContain(`/api/files/col_media/${media.id}/${replaced.file}"`)
 	})
 
-	it('are left alone when the media record is gone', async () => {
+	it('lose their src when the media record is gone', async () => {
 		const media = await editor.collection('media').create(mediaForm('Gone'))
 		const id = await createPost(media.id)
 		await editor.collection('media').delete(media.id)
-		expect(await bodyOf(anonymous(server.url), id)).toContain('<img src="https://old.example/a.png"')
+		expect(await bodyOf(anonymous(server.url), id)).toContain(`<img alt="A" data-media-id="${media.id}" width="10">`)
 	})
 
-	it('resolve only media the requester may view, and the stored HTML never changes', async () => {
+	it('lose their src when the requester may not view the media, and the stored HTML never changes', async () => {
 		const media = await editor.collection('media').create(mediaForm('Private'))
 		const id = await createPost(media.id)
 		// null means superusers only.
 		// eslint-disable-next-line unicorn/no-null -- PocketBase's API takes null here
 		await admin.collections.update('media', { viewRule: null })
 		try {
-			expect(await bodyOf(editor, id)).toContain('<img src="https://old.example/a.png"')
+			expect(await bodyOf(editor, id)).toContain(`<img alt="A" data-media-id="${media.id}" width="10">`)
 			expect(await bodyOf(admin, id)).toContain(`/api/files/col_media/${media.id}/${media.file}"`)
 		} finally {
 			await admin.collections.update('media', { viewRule: '' })
 		}
+		const stored = await admin.send<{ body: string }>(`/test/raw-post-body/${id}`, {})
+		expect(stored.body).toContain('<img src="https://old.example/a.png" alt="A"')
+	})
+
+	it('resolve at most 200 media ids per record; images past that lose their src', async () => {
+		const media = await editor.collection('media').create(mediaForm('Late'))
+		const missing = Array.from(
+			{ length: 200 },
+			(_, index) => `<img src="m${index}.png" data-media-id="missing${index}">`,
+		)
+		const body = `${missing.join('')}<img src="late.png" data-media-id="${media.id}">`
+		const { id } = await editor.collection('posts').create({ body, slug: uniqueId(), title: 'Many' })
+		const served = await bodyOf(anonymous(server.url), id)
+		expect(served).toContain(`<img data-media-id="${media.id}">`)
+		expect(served).not.toContain('src=')
 	})
 
 	describe('with PBCMS_PUBLIC_URL', () => {

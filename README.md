@@ -43,18 +43,18 @@ When the config names a collection or field that your PocketBase schema does not
 
 The JavaScript hooks live in [`hooks/pb_hooks/`](hooks/pb_hooks). Copy the files you need, together with the `pbcms/` folder they load, into your PocketBase's `pb_hooks/`.
 
-| File                     | What it does                                                                                                              |
-| ------------------------ | ------------------------------------------------------------------------------------------------------------------------- |
-| `pbcms_sanitize.pb.js`   | Cleans the HTML of every `editor` field before a record is saved, whether it comes from the CMS, the API or the dashboard |
-| `pbcms_media_urls.pb.js` | In API responses, points every `<img data-media-id="…">` in an `editor` field at the current file of that `media` record  |
+| File                     | What it does                                                                                                                             |
+| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `pbcms_sanitize.pb.js`   | Cleans the HTML of every `editor` field when a record is saved through PocketBase: from the CMS, the API, the dashboard or `app.save()`  |
+| `pbcms_media_urls.pb.js` | In API responses, cleans every `editor` field again and points each `<img data-media-id="…">` at the current file of that `media` record |
 
-The sanitizer keeps the tags and attributes the CMS's editor writes (paragraphs, headings, lists, links, images, tables, text alignment and colors) and removes everything else, including scripts, event handlers and `javascript:` URLs.
+The sanitizer keeps the tags and attributes the CMS's editor writes (paragraphs, headings, lists, links, images, tables, text alignment and colors) and removes everything else, including scripts, event handlers and `javascript:` URLs. A rich text field longer than 200,000 characters is refused on save.
 
-The CMS stores an image in rich text as `<img src="…" data-media-id="<media record id>" width="…" height="…">`. The stored HTML works on its own; the media hook only rewrites `src` in responses, so replacing a media file or moving PocketBase to a new domain never leaves stale image URLs. It expects a `media` collection with a `file` field, as in the preset, and resolves only the media records the requester may view.
+The CMS stores an image in rich text as `<img src="…" data-media-id="<media record id>" width="…" height="…">`. The stored HTML works on its own; the media hook only rewrites `src` in responses, so replacing a media file or moving PocketBase to a new domain never leaves stale image URLs. It expects a `media` collection with a `file` field, as in the preset. An image whose media record is deleted, or not viewable by the requester, loses its `src` in the response. This only hides the URL in rich text: to really keep a file private, mark the `file` field as protected, since PocketBase serves unprotected files to anyone who knows the URL.
 
 File URLs start with the `PBCMS_PUBLIC_URL` environment variable (for example `https://pb.example.com`), or with the Application URL in PocketBase's settings when the variable is not set. Request headers such as `X-Forwarded-Host` are not used, because clients can forge them.
 
-The hooks act on saves and reads from the moment they are installed. Records saved earlier are cleaned the next time they are saved.
+Saving through PocketBase is not the only way HTML gets into the database: records saved before the hooks were installed, restored backups, raw SQL, and a hook that changes a value after the sanitizer has run all skip the save-time check. That is why the media hook sanitizes every `editor` field in responses too. Install both hooks, even if you don't use `media`.
 
 ## Development
 

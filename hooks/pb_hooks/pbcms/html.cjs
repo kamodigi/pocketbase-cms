@@ -63,8 +63,9 @@ const RAW_TEXT_TAGS = new Set([
 	'xmp',
 ])
 
-const INTEGER = /^\d+$/
-const SIZE = /^\d+(?:\.\d+)?%?$/
+// Digit counts are capped: no real table or image needs more.
+const INTEGER = /^\d{1,4}$/
+const SIZE = /^\d{1,6}(?:\.\d{1,4})?%?$/
 
 // Attribute name -> check. A check returns the value to keep, or undefined to drop the attribute.
 const ALLOWED_ATTRS = {
@@ -98,8 +99,19 @@ const MAX_DEPTH = 100
 
 const ALLOWED_SCHEMES = new Set(['http', 'https', 'mailto', 'tel'])
 
-const COLOR = /^(?:#[\da-f]{3,8}|(?:rgb|hsl)a?\(\s*[\d.%]+(?:deg)?(?:\s*[\s,/]\s*[\d.%]+){2,3}\s*\)|[a-z]+)$/i
-const LENGTH = /^\d+(?:\.\d+)?(?:px|%|em|rem)$/
+// Matched against values normalized by normalizeStyleValue: no space around "(", ")", "," and "/",
+// and single spaces elsewhere. Each separator is one character that a number cannot contain, so
+// the patterns never backtrack.
+const NUMBER = String.raw`[\d.]{1,10}(?:%|deg)?`
+const COLOR = new RegExp(
+	String.raw`^(?:#[\da-f]{3,8}|(?:rgb|hsl)a?\(${NUMBER}(?:[ ,/]${NUMBER}){2,3}\)|[a-z]{1,30})$`,
+	'i',
+)
+const LENGTH = /^\d{1,6}(?:\.\d{1,4})?(?:px|%|em|rem)$/
+
+// Longer style attributes and declaration values are dropped without being looked at.
+const MAX_STYLE_LENGTH = 1000
+const MAX_STYLE_VALUE_LENGTH = 100
 
 // CSS property -> allowed value. Only what the editor writes: alignment, colors and table widths.
 const ALLOWED_STYLES = {
@@ -158,10 +170,12 @@ function escapeAttribute(value) {
 
 function escapeText(text) {
 	// Keep character references the input already has, but escape a bare "&".
-	return text
-		.replaceAll(/&(?![a-z][\da-z]*;|#\d+;|#x[\da-f]+;)/gi, '&amp;')
-		.replaceAll('<', '&lt;')
-		.replaceAll('>', '&gt;')
+	return /[&<>]/.test(text)
+		? text
+				.replaceAll(/&(?![a-z][\da-z]*;|#\d+;|#x[\da-f]+;)/gi, '&amp;')
+				.replaceAll('<', '&lt;')
+				.replaceAll('>', '&gt;')
+		: text
 }
 
 /**
@@ -203,6 +217,15 @@ function isControlOrSpace(code) {
 	return code <= 0x20 || (code >= 0x7f && code <= 0x9f)
 }
 
+const SPACES = new Set([0x09, 0x0a, 0x0c, 0x0d, 0x20])
+const GT = 0x3e
+const SLASH = 0x2f
+const EQUALS = 0x3d
+
+function isAttributeNameEnd(code) {
+	return code === EQUALS || isTagNameEnd(code)
+}
+
 /**
 Whether a string looks like a PocketBase record id.
 */
@@ -210,9 +233,36 @@ function isMediaId(value) {
 	return /^[\w-]{1,100}$/.test(value)
 }
 
+/**
+HTML whitespace: tab, line feed, form feed, carriage return and space. Character tests here use
+char codes rather than regular expressions, which are slow per character in PocketBase's engine.
+*/
+function isSpace(code) {
+	return SPACES.has(code)
+}
+
+function isTagNameEnd(code) {
+	return code === GT || code === SLASH || isSpace(code)
+}
+
+function isUnquotedValueEnd(code) {
+	return code === GT || isSpace(code)
+}
+
 function mediaIdOf(token) {
 	const attr = token.attrs.find(a => a.name === 'data-media-id')
 	return attr && isMediaId(attr.value) ? attr.value : undefined
+}
+
+/**
+Collapses whitespace to single spaces, then removes the spaces around "(", ")", "," and "/".
+Collapsing first keeps the second step linear.
+*/
+function normalizeStyleValue(value) {
+	return value
+		.replaceAll(/\s+/g, ' ')
+		.trim()
+		.replaceAll(/ ?([(),/]) ?/g, '$1')
 }
 
 /**
@@ -230,27 +280,27 @@ Reads a tag name and attributes from `from` up to and including ">".
 function readTag(html, from) {
 	const length = html.length
 	let pos = from
-	while (pos < length && !/[\s/>]/.test(html.charAt(pos))) pos++
+	while (pos < length && !isTagNameEnd(html.codePointAt(pos))) pos++
 	const name = html.slice(from, pos).toLowerCase()
 	const attrs = []
 
 	while (pos < length) {
-		const char = html.charAt(pos)
-		if (char === '>') return { attrs, name, to: pos + 1 }
-		if (/[\s/]/.test(char)) {
+		const code = html.codePointAt(pos)
+		if (code === GT) return { attrs, name, to: pos + 1 }
+		if (code === SLASH || isSpace(code)) {
 			pos++
 			continue
 		}
 		const attrStart = pos
 		pos++ // The first character may be "=", which then belongs to the name.
-		while (pos < length && !/[\s/>=]/.test(html.charAt(pos))) pos++
+		while (pos < length && !isAttributeNameEnd(html.codePointAt(pos))) pos++
 		const attrName = html.slice(attrStart, pos).toLowerCase()
 		const nameEnd = pos
 		let value = ''
-		while (pos < length && /\s/.test(html.charAt(pos))) pos++
+		while (pos < length && isSpace(html.codePointAt(pos))) pos++
 		if (html.charAt(pos) === '=') {
 			pos++
-			while (pos < length && /\s/.test(html.charAt(pos))) pos++
+			while (pos < length && isSpace(html.codePointAt(pos))) pos++
 			const quote = html.charAt(pos)
 			if (quote === '"' || quote === "'") {
 				const close = html.indexOf(quote, pos + 1)
@@ -259,7 +309,7 @@ function readTag(html, from) {
 				pos = close + 1
 			} else {
 				const valueStart = pos
-				while (pos < length && !/[\s>]/.test(html.charAt(pos))) pos++
+				while (pos < length && !isUnquotedValueEnd(html.codePointAt(pos))) pos++
 				value = html.slice(valueStart, pos)
 			}
 		} else {
@@ -272,8 +322,20 @@ function readTag(html, from) {
 }
 
 /**
-Sets the src of every <img data-media-id> to urls[id]. Images without the attribute, or whose id
-is not in `urls`, are left alone, as is everything else in `html`.
+Adds noopener to rel when there is a target. Browsers imply it for _blank only, not for named
+targets.
+*/
+function requireNoopener(attrs) {
+	if (attrs.every(attr => attr.name !== 'target')) return
+	const rel = attrs.find(attr => attr.name === 'rel')
+	if (!rel) attrs.push({ name: 'rel', value: 'noopener' })
+	else if (!rel.value.split(' ').includes('noopener')) rel.value += ' noopener'
+}
+
+/**
+Sets the src of every <img data-media-id> to urls[id], or removes it when the id is not in `urls`
+(a deleted media record, or one the requester may not view). Images without the attribute are
+left alone, as is everything else in `html`.
 */
 function rewriteMediaSrc(html, urls) {
 	if (typeof html !== 'string' || !html.includes('data-media-id')) return html
@@ -282,9 +344,10 @@ function rewriteMediaSrc(html, urls) {
 	for (const token of tokenize(html)) {
 		if (token.type !== 'start' || token.name !== 'img') continue
 		const id = mediaIdOf(token)
-		if (id === undefined || !Object.prototype.hasOwnProperty.call(urls, id)) continue
-		const attrs = token.attrs.filter(a => a.name !== 'src')
-		attrs.unshift({ name: 'src', value: urls[id] })
+		if (id === undefined) continue
+		// The input is sanitized already; checking names again keeps the output well-formed anyway.
+		const attrs = token.attrs.filter(a => a.name !== 'src' && /^[a-z][\w-]*$/.test(a.name))
+		if (Object.prototype.hasOwnProperty.call(urls, id)) attrs.unshift({ name: 'src', value: urls[id] })
 		out += html.slice(copied, token.from) + serializeStartTag('img', attrs)
 		copied = token.to
 	}
@@ -295,12 +358,14 @@ function rewriteMediaSrc(html, urls) {
 Keeps the declarations in ALLOWED_STYLES whose values match; drops the rest.
 */
 function safeStyle(value) {
+	if (value.length > MAX_STYLE_LENGTH) return
 	const kept = []
 	for (const declaration of value.split(';')) {
 		const colon = declaration.indexOf(':')
 		if (colon === -1) continue
 		const property = declaration.slice(0, colon).trim().toLowerCase()
-		const propertyValue = declaration.slice(colon + 1).trim()
+		const propertyValue = normalizeStyleValue(declaration.slice(colon + 1))
+		if (propertyValue.length > MAX_STYLE_VALUE_LENGTH) continue
 		const pattern = Object.prototype.hasOwnProperty.call(ALLOWED_STYLES, property)
 			? ALLOWED_STYLES[property]
 			: undefined
@@ -352,6 +417,7 @@ function sanitizeHtml(html) {
 				const value = check ? check(attr.value) : undefined
 				if (value !== undefined) attrs.push({ name: attr.name, value })
 			}
+			requireNoopener(attrs)
 			if (VOID_TAGS.has(token.name)) {
 				out += serializeStartTag(token.name, attrs)
 			} else if (open.length < MAX_DEPTH) {
@@ -459,4 +525,9 @@ function trimTrailingSlash(url) {
 	return typeof url === 'string' ? url.trim().replace(/\/+$/, '') : ''
 }
 
-module.exports = { fileUrl, findMediaIds, publicBaseUrl, rewriteMediaSrc, sanitizeHtml }
+// Longer HTML is refused on save and emptied in responses. Sanitizing is linear but slow in
+// PocketBase's engine (about 0.5 s for this much hostile markup), and responses sanitize again on
+// every read. Real rich text stays far below it; images are only references.
+const MAX_HTML_LENGTH = 200_000
+
+module.exports = { fileUrl, findMediaIds, MAX_HTML_LENGTH, publicBaseUrl, rewriteMediaSrc, sanitizeHtml }

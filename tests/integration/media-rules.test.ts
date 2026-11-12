@@ -1,19 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { anonymous, asEditor, asNewUser, uniqueId } from './clients'
-
-// A 1x1 transparent PNG.
-const png = Uint8Array.from(
-	atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=='),
-	character => character.codePointAt(0)!,
-)
-
-function mediaForm(alt: string): FormData {
-	const form = new FormData()
-	form.append('file', new Blob([png], { type: 'image/png' }), 'pixel.png')
-	form.append('alt', alt)
-	return form
-}
+import { anonymous, asEditor, asNewUser, mediaForm, uniqueId } from './clients'
 
 // The rules of examples/lantern-coffee/pb_migrations/1790000100_create_media.js: public, editors write.
 describe('media', () => {

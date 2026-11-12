@@ -3,15 +3,23 @@ import { inject } from 'vitest'
 
 import { devAccounts } from '../pocketbase'
 
-export function anonymous(): PocketBase {
-	const pb = new PocketBase(inject('pocketbaseUrl'))
+// A 1x1 transparent PNG.
+const png = Uint8Array.from(
+	atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=='),
+	character => character.codePointAt(0)!,
+)
+
+// Each client takes the PocketBase to talk to; the default is the one shared by the whole run.
+
+export function anonymous(url = inject('pocketbaseUrl')): PocketBase {
+	const pb = new PocketBase(url)
 	// Tests send requests in parallel; the SDK would otherwise cancel duplicates.
 	pb.autoCancellation(false)
 	return pb
 }
 
-export async function asEditor(): Promise<PocketBase> {
-	const pb = anonymous()
+export async function asEditor(url?: string): Promise<PocketBase> {
+	const pb = anonymous(url)
 	await pb.collection('users').authWithPassword(devAccounts.editor.email, devAccounts.editor.password)
 	return pb
 }
@@ -29,10 +37,20 @@ export async function asNewUser(): Promise<{ id: string; pb: PocketBase }> {
 	return { id, pb }
 }
 
-export async function asSuperuser(): Promise<PocketBase> {
-	const pb = anonymous()
+export async function asSuperuser(url?: string): Promise<PocketBase> {
+	const pb = anonymous(url)
 	await pb.collection('_superusers').authWithPassword(devAccounts.superuser.email, devAccounts.superuser.password)
 	return pb
+}
+
+/**
+A form for the media collection with a 1x1 PNG, named `filename`.
+*/
+export function mediaForm(alt: string, filename = 'pixel.png'): FormData {
+	const form = new FormData()
+	form.append('file', new Blob([png], { type: 'image/png' }), filename)
+	form.append('alt', alt)
+	return form
 }
 
 /**

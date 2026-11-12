@@ -1,6 +1,7 @@
 import { paraglideVitePlugin } from '@inlang/paraglide-js'
 import adapter from '@sveltejs/adapter-static'
 import { sveltekit } from '@sveltejs/kit/vite'
+import tailwindcss from '@tailwindcss/vite'
 import { svelteTesting } from '@testing-library/svelte/vite'
 import { loadEnv } from 'vite'
 import { defineConfig } from 'vitest/config'
@@ -14,6 +15,7 @@ export default defineConfig(({ mode }) => {
 	return {
 		plugins: [
 			configValidator(),
+			tailwindcss(),
 			sveltekit({
 				// The CMS is a static SPA copied into PocketBase's pb_public (e.g. pb_public/cms/).
 				adapter: adapter(),

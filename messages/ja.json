@@ -3,5 +3,16 @@
 	"home_scaffold_notice": "PocketBase の管理画面です。このビルドは雛形で、編集画面はまだ実装されていません。",
 	"language_switcher_label": "言語",
 	"config_issues_errors_heading": "cms.config.json に誤りがあります",
-	"config_issues_warnings_heading": "cms.config.json が PocketBase のスキーマと一致しません"
+	"config_issues_warnings_heading": "cms.config.json が PocketBase のスキーマと一致しません",
+	"theme_toggle_label": "表示モード",
+	"theme_light": "ライト",
+	"theme_dark": "ダーク",
+	"theme_system": "OS の設定に従う",
+	"brand_contrast_heading": "cms.config.json の brand.accent は読みにくい色です",
+	"brand_contrast_button": "アクセントの色の上のボタンの文字が、{mode}モードでコントラスト {ratio}:1 です（{required}:1 以上が必要）。",
+	"brand_contrast_ui": "アクセントの色のボタンとフォーカスの枠が、{mode}モードで背景とのコントラスト {ratio}:1 です（{required}:1 以上が必要）。",
+	"brand_contrast_hint": "ライトモードでは濃い色、ダークモードでは明るい色にしてください。目標は WCAG 2.2 AA です。",
+	"shell_skip_to_content": "本文へ移動",
+	"shell_nav_label": "メインメニュー",
+	"shell_toggle_navigation": "メニューを開閉"
 }

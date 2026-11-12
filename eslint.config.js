@@ -19,6 +19,8 @@ export default defineConfig(
 	includeIgnoreFile(gitignorePath),
 	// PocketBase JS migrations run in PocketBase's own JS runtime, where API rules use null to mean "superusers only".
 	{ ignores: ['dev/pb_migrations/', 'examples/*/pb_migrations/'] },
+	// Components copied from shadcn-svelte keep the upstream style so they can be diffed against it.
+	{ ignores: ['src/lib/components/ui/', 'src/lib/hooks/'] },
 	js.configs.recommended,
 	...ts.configs.recommended,
 	perfectionist.configs['recommended-natural'],

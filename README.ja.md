@@ -52,6 +52,18 @@ pnpm test     # ユニットテスト
 pnpm build    # build/ に静的ファイルを書き出す
 ```
 
+### 統合テストと E2E
+
+どちらも本物の PocketBase に対して動きます。`compose.yaml` のバージョンの公式バイナリ（初回に `node_modules/.cache/pocketbase/` にダウンロード）を、例のプリセットと開発用のアカウントつきで、使い捨てのデータディレクトリで起動します。終わるとデータは消えます。Docker は不要です。
+
+```sh
+pnpm test:integration                  # API ルールとフック（tests/integration/）
+pnpm exec playwright install chromium  # 最初の E2E の前に一度だけ
+pnpm build && pnpm test:e2e            # pb_public/cms/ に置いたビルド済みの CMS（tests/e2e/）
+```
+
+E2E の PocketBase はポート 8091 で動きます。別のポートにするときは `E2E_PORT` を設定します。
+
 本物の PocketBase で試すときは、`build/` を `pb_public/cms/` にコピーして `pocketbase serve` を実行します。
 
 画面の文言は `messages/en.json` と `messages/ja.json` にあります（[Paraglide JS](https://inlang.com/m/gerre34r/library-inlang-paraglideJs)）。`src/paraglide/` のコンパイル結果は `pnpm install`、`pnpm dev`、`pnpm build` で生成されます。表示言語は、ユーザーの選択、ブラウザの言語設定、英語の順で決まります。

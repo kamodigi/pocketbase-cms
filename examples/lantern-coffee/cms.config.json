@@ -1,0 +1,93 @@
+{
+	"version": 1,
+	"brand": { "name": "Lantern Coffee" },
+	"media": {
+		"collection": "media",
+		"fileField": "file",
+		"altField": "alt",
+		"captionField": "caption",
+		"widthField": "width",
+		"heightField": "height",
+		"mimeField": "mime",
+		"compress": { "maxWidth": 1920, "quality": 0.85, "format": "webp" }
+	},
+	"nav": [{ "label": "Content", "items": ["posts", "stores", "about", "media"] }],
+	"collections": {
+		"posts": {
+			"label": "Posts",
+			"icon": "newspaper",
+			"titleField": "title",
+			"status": { "draftField": "draft", "publishedAtField": "published_at" },
+			"list": {
+				"columns": ["title", "category", "$status", "published_at", "updated"],
+				"sort": "-published_at",
+				"perPage": 20
+			},
+			"form": { "main": ["title", "body"], "side": ["slug", "category", "published_at", "draft", "pinned", "cover"] },
+			"fields": {
+				"title": { "label": "Title" },
+				"slug": { "label": "Slug", "widget": "slug", "slugFrom": "title" },
+				"body": { "label": "Body" },
+				"cover": { "label": "Cover image", "widget": "media" },
+				"category": { "label": "Category", "options": { "news": "News", "event": "Event", "journal": "Journal" } },
+				"pinned": { "label": "Pinned", "badge": "Pinned", "help": "Shown at the top of the list on the site." },
+				"draft": { "label": "Draft" },
+				"published_at": { "label": "Published at", "widget": "datetime", "help": "A future date schedules the post." }
+			}
+		},
+		"stores": {
+			"label": "Stores",
+			"icon": "store",
+			"titleField": "name",
+			"list": {
+				"columns": ["name", "region", "address", "url"],
+				"sort": "region,name",
+				"perPage": 100,
+				"search": ["name", "address"]
+			},
+			"fields": {
+				"name": { "label": "Name" },
+				"region": {
+					"label": "Region",
+					"options": { "north": "North", "south": "South", "east": "East", "west": "West" }
+				},
+				"address": { "label": "Address" },
+				"url": { "label": "Website" }
+			}
+		},
+		"about": {
+			"label": "About page",
+			"icon": "info",
+			"singleton": true,
+			"titleField": "title",
+			"fields": {
+				"title": { "label": "Title" },
+				"body": { "label": "Body" },
+				"image": { "label": "Image", "widget": "media" }
+			}
+		},
+		"media": {
+			"label": "Media",
+			"icon": "image",
+			"titleField": "alt",
+			"list": {
+				"columns": ["file", "alt", "caption", "created"],
+				"sort": "-created",
+				"perPage": 40,
+				"search": ["alt", "caption"]
+			},
+			"fields": {
+				"file": { "label": "Image" },
+				"alt": {
+					"label": "Alt text",
+					"help": "Describe the image briefly. Screen readers read it, and browsers show it when the image fails to load."
+				},
+				"caption": { "label": "Caption" },
+				"width": { "readonly": true },
+				"height": { "readonly": true },
+				"mime": { "hidden": true },
+				"uploadedBy": { "autofill": "currentUser" }
+			}
+		}
+	}
+}

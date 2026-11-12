@@ -17,6 +17,8 @@ const gitignorePath = fileURLToPath(new URL('.gitignore', import.meta.url))
 
 export default defineConfig(
 	includeIgnoreFile(gitignorePath),
+	// PocketBase JS migrations run in PocketBase's own JS runtime, where API rules use null to mean "superusers only".
+	{ ignores: ['dev/pb_migrations/', 'examples/*/pb_migrations/'] },
 	js.configs.recommended,
 	...ts.configs.recommended,
 	perfectionist.configs['recommended-natural'],

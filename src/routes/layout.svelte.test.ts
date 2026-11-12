@@ -26,4 +26,22 @@ describe('root layout', () => {
 		expect(screen.getByRole('alert')).toHaveTextContent('/theme unknown key')
 		expect(screen.queryByText('screen')).not.toBeInTheDocument()
 	})
+
+	it('uses brand.favicon for the tab icon when the config sets it', () => {
+		renderLayout({ config: { brand: { favicon: 'site.svg' }, collections: { posts: {} }, version: 1 }, ok: true })
+
+		expect(document.head.querySelector('link[rel="icon"]')).toHaveAttribute(
+			'href',
+			expect.stringMatching(/\/site\.svg$/),
+		)
+	})
+
+	it('keeps the bundled favicon without brand.favicon', () => {
+		renderLayout({ config: { collections: { posts: {} }, version: 1 }, ok: true })
+
+		expect(document.head.querySelector('link[rel="icon"]')).not.toHaveAttribute(
+			'href',
+			expect.stringMatching(/site\.svg/),
+		)
+	})
 })

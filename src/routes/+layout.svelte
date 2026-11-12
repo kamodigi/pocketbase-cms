@@ -4,6 +4,7 @@
 	import favicon from '#lib/assets/favicon.svg'
 	import { Toaster } from '#lib/components/ui/sonner/index.js'
 	import ConfigIssues from '#lib/config/config-issues.svelte'
+	import { brandAssetUrl } from '#lib/theme/asset-url.js'
 	import { applyAccent, checkContrast } from '#lib/theme/brand.js'
 	import ContrastWarnings from '#lib/theme/contrast-warnings.svelte'
 	import { isHexColor } from '#lib/theme/contrast.js'
@@ -15,6 +16,7 @@
 
 	let { children, data }: LayoutProps = $props()
 
+	const brandFavicon = $derived(data.config.ok ? data.config.config.brand?.favicon : undefined)
 	const accent = $derived(data.config.ok ? data.config.config.brand?.accent : undefined)
 	// A pale accent gets a warning above the screen; the CMS still uses it.
 	const contrastWarnings = $derived(
@@ -33,7 +35,7 @@
 </script>
 
 <svelte:head>
-	<link href={favicon} rel="icon" />
+	<link href={brandFavicon ? brandAssetUrl(brandFavicon) : favicon} rel="icon" />
 </svelte:head>
 
 <ModeWatcher />

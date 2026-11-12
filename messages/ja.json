@@ -1,0 +1,5 @@
+{
+	"$schema": "https://inlang.com/schema/inlang-message-format",
+	"home_scaffold_notice": "PocketBase の管理画面です。このビルドは雛形で、編集画面はまだ実装されていません。",
+	"language_switcher_label": "言語"
+}

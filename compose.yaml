@@ -14,6 +14,8 @@ services:
       # The entrypoint merges both into pb_migrations.
       - ./examples/lantern-coffee/pb_migrations:/migrations/examples:ro
       - ./dev/pb_migrations:/migrations/dev:ro
+      # The JavaScript hooks, as a site would copy them into its pb_hooks.
+      - ./hooks/pb_hooks:/pb/pb_hooks:ro
       # Served at http://localhost:8090/cms/config.json, like the config in a real site.
       - ./examples/lantern-coffee/cms.config.json:/pb/pb_public/cms/config.json:ro
 

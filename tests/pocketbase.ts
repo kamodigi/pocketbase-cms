@@ -1,5 +1,6 @@
 // Starts a throwaway PocketBase for the integration and E2E tests: the official binary at the
-// version in compose.yaml, the example presets and the dev seed, and a fresh data directory.
+// version in compose.yaml, the example presets, the dev seed and the hooks in hooks/pb_hooks/, and
+// a fresh data directory.
 import { unzipSync } from 'fflate'
 import { spawn } from 'node:child_process'
 import { existsSync } from 'node:fs'
@@ -35,6 +36,14 @@ export interface PocketBaseServer {
 
 export interface StartOptions {
 	/**
+	Extra environment variables for PocketBase, such as PBCMS_PUBLIC_URL.
+	*/
+	env?: Record<string, string>
+	/**
+	Extra files for pb_hooks, next to the ones in hooks/pb_hooks/. Keys are file names, values are source files.
+	*/
+	hooks?: Record<string, string>
+	/**
 	Defaults to a free port.
 	*/
 	port?: number
@@ -54,11 +63,17 @@ export async function startPocketBase(options: StartOptions = {}): Promise<Pocke
 	const workDirectory = await mkdtemp(path.join(tmpdir(), 'pocketbase-cms-test-'))
 	const migrationsDirectory = path.join(workDirectory, 'pb_migrations')
 	const publicDirectory = path.join(workDirectory, 'pb_public')
+	const hooksDirectory = path.join(workDirectory, 'pb_hooks')
 
 	// Same as dev/entrypoint.sh: PocketBase reads migrations from one directory.
 	await mkdir(migrationsDirectory)
 	for (const source of ['examples/lantern-coffee/pb_migrations', 'dev/pb_migrations']) {
 		await cp(path.join(root, source), migrationsDirectory, { recursive: true })
+	}
+	await cp(path.join(root, 'hooks/pb_hooks'), hooksDirectory, { recursive: true })
+	const hookFiles = Object.entries(options.hooks ?? {})
+	for (const [target, source] of hookFiles) {
+		await cp(path.resolve(root, source), path.join(hooksDirectory, target))
 	}
 	await mkdir(publicDirectory)
 	const publicFiles = Object.entries(options.public ?? {})
@@ -75,8 +90,11 @@ export async function startPocketBase(options: StartOptions = {}): Promise<Pocke
 			`--dir=${path.join(workDirectory, 'pb_data')}`,
 			`--migrationsDir=${migrationsDirectory}`,
 			`--publicDir=${publicDirectory}`,
+			// Same as compose.yaml. Not watched: a restart mid-run would fail the tests in flight.
+			`--hooksDir=${hooksDirectory}`,
+			'--hooksWatch=false',
 		],
-		{ stdio: ['ignore', 'pipe', 'pipe'] },
+		{ env: { ...process.env, ...options.env }, stdio: ['ignore', 'pipe', 'pipe'] },
 	)
 	let output = ''
 	let spawnError: Error | undefined

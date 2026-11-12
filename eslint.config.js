@@ -52,6 +52,20 @@ export default defineConfig(
 		},
 	},
 	{
+		// PocketBase's JS runtime loads hooks and their helpers as CommonJS scripts.
+		files: ['hooks/pb_hooks/**'],
+		rules: {
+			'@typescript-eslint/no-require-imports': 'off',
+			// PocketBase generates pb_data/types.d.ts for editors; hooks reference it this way.
+			'@typescript-eslint/triple-slash-reference': 'off',
+			// The sanitizer matches control characters on purpose.
+			'no-control-regex': 'off',
+			// pb_hooks is the directory name PocketBase looks for.
+			'unicorn/filename-case': 'off',
+			'unicorn/prefer-module': 'off',
+		},
+	},
+	{
 		rules: {
 			// Renames framework types such as SvelteKit's LayoutProps; the churn outweighs the benefit.
 			'unicorn/name-replacements': 'off',

@@ -5,6 +5,7 @@
 	},
 	"include": [
 		"src",
+		"hooks/**/*.ts",
 		"tests",
 		"tools",
 		"playwright.config.ts",

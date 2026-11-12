@@ -39,6 +39,23 @@ CMS は自分と同じフォルダの `config.json` を読み込みます。サ�
 ファイルが無いときや書式が正しくないときは、CMS は画面の代わりにエラーを表示します。
 PocketBase のスキーマに無いコレクションや項目を設定に書いた場合は、画面の上部に警告を出し、その設定を無視します（スキーマを返すフックができてから有効になります）。
 
+## PocketBase のフック
+
+JavaScript のフックは [`hooks/pb_hooks/`](hooks/pb_hooks) にあります。使うファイルを、読み込む `pbcms/` フォルダと一緒に、自分の PocketBase の `pb_hooks/` にコピーします。
+
+| ファイル                 | 役割                                                                                                              |
+| ------------------------ | ----------------------------------------------------------------------------------------------------------------- |
+| `pbcms_sanitize.pb.js`   | レコードを保存する前に、`editor` 型の項目の HTML を無害化する。CMS・API・ダッシュボードのどこから保存しても効く   |
+| `pbcms_media_urls.pb.js` | API の応答で、`editor` 型の項目の `<img data-media-id="…">` の画像を、その `media` レコードの今のファイルに向ける |
+
+サニタイズでは、CMS のエディタが書き出すタグと属性（段落、見出し、リスト、リンク、画像、表、文字の揃えと色）だけを残し、script、イベントハンドラ、`javascript:` の URL などはすべて取り除きます。
+
+CMS は本文中の画像を `<img src="…" data-media-id="<media のレコードの id>" width="…" height="…">` の形で保存します。保存した HTML はそれだけで表示できます。メディアのフックは応答の `src` だけを書き換えるので、media のファイルを差し替えたり PocketBase のドメインを変えたりしても、本文の画像の URL が古いまま残りません。プリセットと同じく、`file` 項目を持つ `media` コレクションが必要です。URL を引き直すのは、リクエストした人が閲覧できる media のレコードだけです。
+
+ファイルの URL の先頭には環境変数 `PBCMS_PUBLIC_URL`（例：`https://pb.example.com`）を使い、設定が無ければ PocketBase の設定の Application URL を使います。`X-Forwarded-Host` などのリクエストヘッダーは、クライアントが偽れるので使いません。
+
+フックが効くのは、入れたあとの保存と読み出しです。それより前に保存したレコードは、次に保存したときに無害化されます。
+
 ## 開発
 
 必要なもの：Node.js 22 以上と pnpm
@@ -78,7 +95,7 @@ pnpm install
 pnpm dev                       # CMS: http://localhost:5173/cms/
 ```
 
-CMS には `editor@example.com` / `password1234` でログインします。PocketBase のダッシュボード <http://localhost:8090/_/> には `admin@example.com` / `password1234` で入れます。これらのアカウントは `dev/pb_migrations/` が作るもので、ローカルの開発専用です。
+CMS には `editor@example.com` / `password1234` でログインします。PocketBase のダッシュボード <http://localhost:8090/_/> には `admin@example.com` / `password1234` で入れます。これらのアカウントは `dev/pb_migrations/` が作るもので、ローカルの開発専用です。開発用の PocketBase では `hooks/pb_hooks/` のフックも動きます。
 
 `pnpm dev` は `/api` と `/cms/config.json` を PocketBase に中継します（別のアドレスを使うときは `POCKETBASE_URL` を設定します）。データは Docker のボリュームに入り、`docker compose down -v` で消えます。次の `up` でプリセットから作り直されます。マイグレーションはコンテナの起動時にコピーされるので、編集したら `docker compose restart` してください。
 

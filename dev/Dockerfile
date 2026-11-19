@@ -1,5 +1,5 @@
 # Development PocketBase: the official binary, nothing else. See compose.yaml.
-FROM alpine:3.22 AS downloader
+FROM alpine:3.24 AS downloader
 
 ARG PB_VERSION
 ARG TARGETARCH
@@ -9,7 +9,7 @@ RUN apk add --no-cache ca-certificates unzip wget \
 	&& unzip /tmp/pb.zip pocketbase -d /pb \
 	&& chmod +x /pb/pocketbase
 
-FROM alpine:3.22
+FROM alpine:3.24
 
 RUN apk add --no-cache ca-certificates tzdata wget
 

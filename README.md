@@ -48,6 +48,7 @@ The JavaScript hooks live in [`hooks/pb_hooks/`](hooks/pb_hooks). Copy the files
 | `pbcms_sanitize.pb.js`   | Cleans the HTML of every `editor` field when a record is saved through PocketBase: from the CMS, the API, the dashboard or `app.save()`  |
 | `pbcms_media_urls.pb.js` | In API responses, cleans every `editor` field again and points each `<img data-media-id="…">` at the current file of that `media` record |
 | `pbcms_schema.pb.js`     | Adds `GET /api/cms/schema`, which gives signed-in editors the definitions of the collections the CMS manages                             |
+| `pbcms_notify.pb.js`     | POSTs to your site when a record of a collection the CMS manages is created, updated or deleted                                          |
 
 The sanitizer keeps the tags and attributes the CMS's editor writes (paragraphs, headings, lists, links, images, tables, text alignment and colors) and removes everything else, including scripts, event handlers and `javascript:` URLs. A rich text field longer than 200,000 characters is refused on save.
 
@@ -56,6 +57,30 @@ The CMS stores an image in rich text as `<img src="…" data-media-id="<media re
 File URLs start with the `PBCMS_PUBLIC_URL` environment variable (for example `https://pb.example.com`), or with the Application URL in PocketBase's settings when the variable is not set. Request headers such as `X-Forwarded-Host` are not used, because clients can forge them.
 
 `GET /api/cms/schema` answers only a `users` record with `role = "editor"`: 401 without a token, 403 for anyone else (superusers included; they have PocketBase's own `/api/collections`). It returns `{ "collections": [{ "id", "name", "type", "fields" }] }` for the collections your config names under `collections`, plus `media.collection`, in that order. The fields are PocketBase's own definitions without hidden fields; rules, indexes and auth settings are left out. Names that PocketBase lacks, and system collections such as `_superusers`, are skipped. The hook reads the config from `pb_public/cms/config.json` next to `pb_data` on every request, so a redeployed config takes effect at once. If your public folder lives elsewhere (`--publicDir`), set `PBCMS_CONFIG_PATH` to the file's path. Without a readable config the endpoint answers 500.
+
+### Notifications to your site
+
+`pbcms_notify.pb.js` lets your site rebuild or revalidate its pages when content changes. Set both environment variables of PocketBase; without `PBCMS_NOTIFY_URL` the hook does nothing.
+
+| Variable              | Value                                                                            |
+| --------------------- | -------------------------------------------------------------------------------- |
+| `PBCMS_NOTIFY_URL`    | Where to send the notification, such as `https://www.example.com/api/revalidate` |
+| `PBCMS_NOTIFY_SECRET` | A long random string that your site checks. Nothing is sent without it           |
+
+It covers the same collections as `GET /api/cms/schema` (the config's `collections` and `media.collection`, never system collections), however the record changes: the CMS, the API, the dashboard or `app.save()`. Each change is one `POST` with the secret in the `X-Pbcms-Secret` header and a JSON body:
+
+```json
+{
+	"collection": "posts",
+	"action": "update",
+	"old": { "id": "abc123def456ghi", "slug": "old-slug", "draft": false, "…": "…" },
+	"new": { "id": "abc123def456ghi", "slug": "new-slug", "draft": false, "…": "…" }
+}
+```
+
+`action` is `create`, `update` or `delete`. `old` and `new` are the stored record before and after the change; `old` is `null` for a create and `new` is `null` for a delete. They hold the fields the API returns, without hidden fields, without the email of an auth record that hides it, and without expanded relations. Drafts are notified too, whatever the collection's API rules say. Rich text is as stored, not as the API returns it (see the media hook above), so use the notification to find what changed and read the content to display from the API.
+
+Your endpoint should compare the header with its secret in constant time and answer with a 2xx status. Use its final URL: a redirected request may arrive without its body. PocketBase sends the notification after the change is committed, one at a time, and waits up to 10 seconds for the answer, so a slow endpoint slows down saving. A failure never undoes or fails the save: it is written to PocketBase's logs (Dashboard → Logs) as `pbcms: could not notify the site`, and the notification is not retried.
 
 Saving through PocketBase is not the only way HTML gets into the database: records saved before the hooks were installed, restored backups, raw SQL, and a hook that changes a value after the sanitizer has run all skip the save-time check. That is why the media hook sanitizes every `editor` field in responses too. Install both hooks, even if you don't use `media`.
 

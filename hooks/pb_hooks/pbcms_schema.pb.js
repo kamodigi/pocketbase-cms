@@ -4,10 +4,9 @@
 // /api/collections is for superusers only. No token: 401. Any other account: 403.
 //
 // The collections the CMS manages are the ones the site's config names: the keys of `collections`
-// and `media.collection`. The config is read on every request from PBCMS_CONFIG_PATH if set, else
-// from pb_public/cms/config.json next to pb_data (PocketBase's default layout). Names the schema
-// lacks are skipped, and the CMS warns about them. System collections such as _superusers are never
-// returned.
+// and `media.collection`. The config is read on every request (see pbcms/config.cjs, which has to
+// be next to this file). Names the schema lacks are skipped, and the CMS warns about them. System
+// collections such as _superusers are never returned.
 //
 // Each collection comes as { id, name, type, fields }; fields are PocketBase's own definitions,
 // minus hidden ones (an auth collection's password and tokenKey), which the API never returns
@@ -19,21 +18,14 @@ routerAdd('GET', '/api/cms/schema', e => {
 		throw new ForbiddenError('Only editors can read the CMS schema.')
 	}
 
-	const configPath =
-		$os.getenv('PBCMS_CONFIG_PATH') || $filepath.join($app.dataDir(), '..', 'pb_public', 'cms', 'config.json')
-	let config
+	const { configPath, managedCollectionNames } = require(`${__hooks}/pbcms/config.cjs`)
+	let names
 	try {
-		config = JSON.parse(toString($os.readFile(configPath)))
+		names = managedCollectionNames()
 	} catch (error) {
-		e.app.logger().error('pbcms: could not read the CMS config', 'path', configPath, 'error', String(error))
+		e.app.logger().error('pbcms: could not read the CMS config', 'path', configPath(), 'error', String(error))
 		throw new InternalServerError('The CMS config could not be read on the server.')
 	}
-
-	const names = new Set()
-	if (config && typeof config.collections === 'object' && config.collections !== null) {
-		for (const name of Object.keys(config.collections)) names.add(name)
-	}
-	if (config && config.media && typeof config.media.collection === 'string') names.add(config.media.collection)
 
 	const collections = []
 	for (const name of names) {

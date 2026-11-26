@@ -43,11 +43,12 @@ When the config names a collection or field that your PocketBase schema does not
 
 The JavaScript hooks live in [`hooks/pb_hooks/`](hooks/pb_hooks). Copy the files you need, together with the `pbcms/` folder they load, into your PocketBase's `pb_hooks/`.
 
-| File                     | What it does                                                                                                                             |
-| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| `pbcms_sanitize.pb.js`   | Cleans the HTML of every `editor` field when a record is saved through PocketBase: from the CMS, the API, the dashboard or `app.save()`  |
-| `pbcms_media_urls.pb.js` | In API responses, cleans every `editor` field again and points each `<img data-media-id="…">` at the current file of that `media` record |
-| `pbcms_schema.pb.js`     | Adds `GET /api/cms/schema`, which gives signed-in editors the definitions of the collections the CMS manages                             |
+| File                     | What it does                                                                                                                                          |
+| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pbcms_sanitize.pb.js`   | Cleans the HTML of every `editor` field when a record is saved through PocketBase: from the CMS, the API, the dashboard or `app.save()`               |
+| `pbcms_media_urls.pb.js` | In API responses, cleans every `editor` field again and points each `<img data-media-id="…">` at the current file of that `media` record              |
+| `pbcms_schema.pb.js`     | Adds `GET /api/cms/schema`, which gives signed-in editors the definitions of the collections the CMS manages                                          |
+| `pbcms_preview.pb.js`    | Issues short-lived preview tokens to editors and adds `GET /api/cms/preview/{collection}/{id}`, which lets your site read one draft with such a token |
 
 The sanitizer keeps the tags and attributes the CMS's editor writes (paragraphs, headings, lists, links, images, tables, text alignment and colors) and removes everything else, including scripts, event handlers and `javascript:` URLs. A rich text field longer than 200,000 characters is refused on save.
 
@@ -56,6 +57,8 @@ The CMS stores an image in rich text as `<img src="…" data-media-id="<media re
 File URLs start with the `PBCMS_PUBLIC_URL` environment variable (for example `https://pb.example.com`), or with the Application URL in PocketBase's settings when the variable is not set. Request headers such as `X-Forwarded-Host` are not used, because clients can forge them.
 
 `GET /api/cms/schema` answers only a `users` record with `role = "editor"`: 401 without a token, 403 for anyone else (superusers included; they have PocketBase's own `/api/collections`). It returns `{ "collections": [{ "id", "name", "type", "fields" }] }` for the collections your config names under `collections`, plus `media.collection`, in that order. The fields are PocketBase's own definitions without hidden fields; rules, indexes and auth settings are left out. Names that PocketBase lacks, and system collections such as `_superusers`, are skipped. The hook reads the config from `pb_public/cms/config.json` next to `pb_data` on every request, so a redeployed config takes effect at once. If your public folder lives elsewhere (`--publicDir`), set `PBCMS_CONFIG_PATH` to the file's path. Without a readable config the endpoint answers 500.
+
+The preview hook lets your site show a draft without ever seeing an editor's token. An editor calls `POST /api/cms/preview/{collection}/{id}/token` and gets `{ "token", "expiresAt" }`: a token for that one record, valid for 10 minutes (set `PBCMS_PREVIEW_TOKEN_DURATION` to a number of seconds to change it). It answers 401 without a sign-in, 403 for anyone but an editor, and 404 for a collection the CMS does not manage (the same ones as `GET /api/cms/schema`) or a missing record. Your site then calls `GET /api/cms/preview/{collection}/{id}` with `Authorization: Bearer <token>` and gets the record as PocketBase's record API returns it, drafts included, whatever the collection's view rule says, with `Cache-Control: no-store`. A missing, invalid or expired token gets 401, a token for another record 403, and a deleted record 404. A token is signed with the editor's own token key, so it stops working when the editor's password changes or the editor loses the role. It is not a PocketBase auth token and cannot be used as one.
 
 Saving through PocketBase is not the only way HTML gets into the database: records saved before the hooks were installed, restored backups, raw SQL, and a hook that changes a value after the sanitizer has run all skip the save-time check. That is why the media hook sanitizes every `editor` field in responses too. Install both hooks, even if you don't use `media`.
 

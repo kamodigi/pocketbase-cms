@@ -11,40 +11,18 @@
 //
 // Each collection comes as { id, name, type, fields }; fields are PocketBase's own definitions,
 // minus hidden ones (an auth collection's password and tokenKey), which the API never returns
-// anyway. Rules, indexes and auth settings are left out.
+// anyway. Rules, indexes and auth settings are left out. Needs pbcms/cms.cjs next to this file.
 
 routerAdd('GET', '/api/cms/schema', e => {
 	if (!e.auth) throw new UnauthorizedError('Sign in as an editor.')
-	if (e.auth.collection().name !== 'users' || e.auth.getString('role') !== 'editor') {
-		throw new ForbiddenError('Only editors can read the CMS schema.')
-	}
+	const cms = require(`${__hooks}/pbcms/cms.cjs`)
+	if (!cms.isEditor(e.auth)) throw new ForbiddenError('Only editors can read the CMS schema.')
 
-	const configPath =
-		$os.getenv('PBCMS_CONFIG_PATH') || $filepath.join($app.dataDir(), '..', 'pb_public', 'cms', 'config.json')
-	let config
-	try {
-		config = JSON.parse(toString($os.readFile(configPath)))
-	} catch (error) {
-		e.app.logger().error('pbcms: could not read the CMS config', 'path', configPath, 'error', String(error))
-		throw new InternalServerError('The CMS config could not be read on the server.')
-	}
-
-	const names = new Set()
-	if (config && typeof config.collections === 'object' && config.collections !== null) {
-		for (const name of Object.keys(config.collections)) names.add(name)
-	}
-	if (config && config.media && typeof config.media.collection === 'string') names.add(config.media.collection)
-
+	const names = cms.managedCollectionNames(e.app)
 	const collections = []
 	for (const name of names) {
-		let collection
-		try {
-			collection = e.app.findCachedCollectionByNameOrId(name)
-		} catch {
-			continue
-		}
-		// Only by name: an id in the config is not a name the CMS can match.
-		if (collection.name !== name || collection.system) continue
+		const collection = cms.findManagedCollection(e.app, names, name)
+		if (!collection) continue
 		// JSON.stringify goes through PocketBase's own JSON encoding of a collection; structuredClone does not.
 		// eslint-disable-next-line unicorn/prefer-structured-clone
 		const { fields, id, type } = JSON.parse(JSON.stringify(collection))

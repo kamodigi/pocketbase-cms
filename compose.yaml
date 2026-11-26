@@ -4,8 +4,11 @@ services:
     build:
       context: dev
       args:
-        # Keep in sync with the PocketBase version named in README.md.
-        PB_VERSION: 0.40.6
+        # The one place that names the version of the official binary. Keep it the same as
+        # ganigeorgiev.com/pocketbase/pocketbase in go.mod and the version named in README.md;
+        # tests/versions.test.ts checks go.mod, and Renovate updates both in one PR.
+        # renovate: datasource=go depName=ganigeorgiev.com/pocketbase/pocketbase
+        PB_VERSION: 0.42.3
     ports:
       - '127.0.0.1:8090:8090'
     volumes:

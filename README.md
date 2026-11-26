@@ -59,9 +59,24 @@ File URLs start with the `PBCMS_PUBLIC_URL` environment variable (for example `h
 
 Saving through PocketBase is not the only way HTML gets into the database: records saved before the hooks were installed, restored backups, raw SQL, and a hook that changes a value after the sanitizer has run all skip the save-time check. That is why the media hook sanitizes every `editor` field in responses too. Install both hooks, even if you don't use `media`.
 
+### Go package
+
+If your PocketBase is built with Go, use the `pbcms` package instead of the JavaScript hooks it replaces. It is built against `ganigeorgiev.com/pocketbase/pocketbase`, PocketBase's module path since v0.41.
+
+```sh
+go get github.com/kamodigi/pocketbase-cms/pbcms
+```
+
+```go
+app := pocketbase.New()
+pbcms.Register(app)
+```
+
+`pbcms.Register` adds `GET /api/cms/schema`, with the same answers, the same checks and the same `PBCMS_CONFIG_PATH` as `pbcms_schema.pb.js`; don't install that hook as well. The other hooks are not in the package yet: until they are, register PocketBase's `jsvm` plugin and keep `pbcms_sanitize.pb.js` and `pbcms_media_urls.pb.js` in `pb_hooks/`, as [`tests/gopocketbase/main.go`](tests/gopocketbase/main.go) does.
+
 ## Development
 
-Requirements: Node.js 22 or later and pnpm.
+Requirements: Node.js 22 or later and pnpm. The Go package needs Go 1.27 or later.
 
 ```sh
 pnpm install
@@ -70,16 +85,23 @@ pnpm check    # type check
 pnpm lint     # prettier + eslint
 pnpm test     # unit tests
 pnpm build    # static build in build/
+go vet ./... && go test ./...   # the Go package
 ```
 
 ### Integration and E2E tests
 
-Both run against a real PocketBase: the official binary at the version in `compose.yaml` (downloaded once into `node_modules/.cache/pocketbase/`), with the example presets, the dev accounts and a fresh data directory that is deleted afterwards. Docker is not needed.
+Both run against a real PocketBase: the official binary at the version in `compose.yaml` (downloaded once from [PocketBase's releases](https://ganigeorgiev.com/pocketbase/pocketbase/releases) into `node_modules/.cache/pocketbase/` and checked against the release's checksums), with the example presets, the dev accounts and a fresh data directory that is deleted afterwards. Docker is not needed.
 
 ```sh
 pnpm test:integration                  # API rules and hooks, in tests/integration/
 pnpm exec playwright install chromium  # once, before the first E2E run
 pnpm build && pnpm test:e2e            # the built CMS in pb_public/cms/, in tests/e2e/
+```
+
+With `PBCMS_POCKETBASE=go`, the same tests run against a PocketBase built with Go and the `pbcms` package from `tests/gopocketbase/` (it needs Go) in place of the official binary, without the JavaScript hooks the package replaces. CI runs both.
+
+```sh
+PBCMS_POCKETBASE=go pnpm test:integration
 ```
 
 The E2E tests serve PocketBase on port 8091; set `E2E_PORT` to use another.
@@ -90,7 +112,7 @@ UI text lives in `messages/en.json` and `messages/ja.json` ([Paraglide JS](https
 
 ## Try it with a development PocketBase
 
-A `compose.yaml` runs the official PocketBase binary (v0.40.6; only the latest minor version is supported) with the example presets in `examples/`. It needs Docker Compose.
+A `compose.yaml` runs the official PocketBase binary (v0.42.3; only the latest minor version is supported, and `go.mod` names the same version) with the example presets in `examples/`. It needs Docker Compose.
 
 ```sh
 docker compose up -d --build   # PocketBase at http://localhost:8090

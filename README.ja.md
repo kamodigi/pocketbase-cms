@@ -37,7 +37,15 @@ CMS は自分と同じフォルダの `config.json` を読み込みます。サ�
 ```
 
 ファイルが無いときや書式が正しくないときは、CMS は画面の代わりにエラーを表示します。
-PocketBase のスキーマに無いコレクションや項目を設定に書いた場合は、画面の上部に警告を出し、その設定を無視します（画面が `GET /api/cms/schema` からスキーマを読むようになってから有効になります）。
+PocketBase のスキーマに無いコレクションや項目を設定に書いた場合は、画面の上部に警告を出し、その設定を無視します。ログインのあとに、`GET /api/cms/schema` から読んだスキーマと照らし合わせます。
+
+### ログインとナビゲーション
+
+ログインできるのは、`users` のうち `role = "editor"` のアカウントだけです。それ以外のアカウントはメッセージを出してすぐにログアウトします。編集者のアカウントが削除されたり権限を外されたりした場合は、次に CMS を開いたときにログアウトします。ログインの状態はブラウザのローカルストレージに保存されるので、再読み込みしても続き、1つのタブでログアウトするとすべてのタブでログアウトします。
+
+「パスワードを忘れた場合」からは、PocketBase 標準の `users` のパスワード再設定の依頼を呼びます。メールは PocketBase が送るので、ダッシュボードでメールの設定（SMTP）をしてください。必要なら `users` コレクションの設定で「Reset password」のテンプレートも変えられます。既定のテンプレートのリンクは、新しいパスワードを設定する PocketBase 自身のページを開きます。CMS は、そのアドレスのアカウントがあってもなくても同じ確認の文を表示します。
+
+サイドバーには `collections` のコレクションを `nav` のグループ分けで並べます。`nav` に書いていないコレクションは最後のグループの末尾に足します。`nav` が無いときは、設定の順に1つのグループにまとめます。ログインすると、サイドバーの最初のコレクションを開きます。`icon` には次の Lucide のアイコン名を使えます。それ以外の名前は `file-text` になります：`award`、`bell`、`book-open`、`box`、`briefcase`、`building`、`calendar`、`camera`、`clipboard-list`、`coffee`、`file`、`file-text`、`folder`、`gift`、`globe`、`graduation-cap`、`handshake`、`heart`、`house`、`image`、`images`、`info`、`layers`、`layout-grid`、`link`、`list`、`mail`、`map`、`map-pin`、`megaphone`、`message-square`、`newspaper`、`package`、`pen-line`、`phone`、`quote`、`rss`、`settings`、`shopping-bag`、`star`、`store`、`tag`、`ticket`、`trophy`、`user`、`users`、`utensils`、`video`。
 
 ## PocketBase のフック
 

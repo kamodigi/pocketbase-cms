@@ -37,7 +37,15 @@ Point `$schema` at it to get completion and checks in your editor:
 ```
 
 If the file is missing or invalid, the CMS shows the errors instead of the screens.
-When the config names a collection or field that your PocketBase schema does not have, the CMS will show a warning at the top of the screen and ignore that setting (once the screens read the schema from `GET /api/cms/schema`).
+When the config names a collection or field that your PocketBase schema does not have, the CMS shows a warning at the top of the screen and ignores that setting. It checks this after sign-in, against the schema from `GET /api/cms/schema`.
+
+### Sign-in and navigation
+
+Only `users` accounts with `role = "editor"` can sign in; anyone else is signed out again with a message. If an editor's account is deleted or loses the role, the CMS signs them out on the next start. The session is kept in the browser's local storage, so it survives a reload and signing out in one tab signs out every tab.
+
+"Forgot your password?" calls PocketBase's own password reset request for `users`. PocketBase sends the email, so configure its mail settings (SMTP) and, if you like, the "Reset password" template under the `users` collection's options in the dashboard. The link in the default template opens PocketBase's own page for setting a new password. The CMS shows the same confirmation whether or not the address has an account.
+
+The sidebar lists the collections in `collections`, grouped by `nav`. Collections that `nav` does not list are appended to its last group; without `nav` they form one group in config order. After sign-in the CMS opens the first collection in the sidebar. `icon` takes one of these Lucide icon names, and any other name shows `file-text`: `award`, `bell`, `book-open`, `box`, `briefcase`, `building`, `calendar`, `camera`, `clipboard-list`, `coffee`, `file`, `file-text`, `folder`, `gift`, `globe`, `graduation-cap`, `handshake`, `heart`, `house`, `image`, `images`, `info`, `layers`, `layout-grid`, `link`, `list`, `mail`, `map`, `map-pin`, `megaphone`, `message-square`, `newspaper`, `package`, `pen-line`, `phone`, `quote`, `rss`, `settings`, `shopping-bag`, `star`, `store`, `tag`, `ticket`, `trophy`, `user`, `users`, `utensils`, `video`.
 
 ## PocketBase hooks
 

@@ -27,12 +27,12 @@ export async function asEditor(url?: string): Promise<PocketBase> {
 /**
 A signed-in user without a role: someone who has an account but is not an editor.
 */
-export async function asNewUser(): Promise<{ id: string; pb: PocketBase }> {
+export async function asNewUser(url?: string): Promise<{ id: string; pb: PocketBase }> {
 	const email = `${uniqueId()}@example.com`
 	const password = 'password1234'
-	const admin = await asSuperuser()
+	const admin = await asSuperuser(url)
 	const { id } = await admin.collection('users').create({ email, password, passwordConfirm: password, verified: true })
-	const pb = anonymous()
+	const pb = anonymous(url)
 	await pb.collection('users').authWithPassword(email, password)
 	return { id, pb }
 }

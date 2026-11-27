@@ -2,6 +2,7 @@
 	import type { Component, Snippet } from 'svelte'
 
 	import * as Sidebar from '#lib/components/ui/sidebar/index.js'
+	import CloseSidebarOnNavigate from '#lib/layout/close-sidebar-on-navigate.svelte'
 	import LocaleSwitcher from '#lib/locale-switcher.svelte'
 	import { brandAssetUrl } from '#lib/theme/asset-url.js'
 	import ThemeToggle from '#lib/theme/theme-toggle.svelte'
@@ -55,6 +56,7 @@
 </a>
 
 <Sidebar.Provider>
+	<CloseSidebarOnNavigate />
 	<Sidebar.Root>
 		<Sidebar.Header>
 			<div class="flex items-center gap-2.5 px-1.5 py-1">
@@ -71,7 +73,7 @@
 				<span class="truncate font-bold">{name}</span>
 			</div>
 		</Sidebar.Header>
-		<Sidebar.Content aria-label={m.shell_nav_label()}>
+		<Sidebar.Content aria-label={m.shell_nav_label()} role="navigation">
 			{#each nav as group, index (index)}
 				<Sidebar.Group>
 					{#if group.label}<Sidebar.GroupLabel>{group.label}</Sidebar.GroupLabel>{/if}

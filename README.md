@@ -37,7 +37,27 @@ Point `$schema` at it to get completion and checks in your editor:
 ```
 
 If the file is missing or invalid, the CMS shows the errors instead of the screens.
-When the config names a collection or field that your PocketBase schema does not have, the CMS will show a warning at the top of the screen and ignore that setting (once the screens read the schema from `GET /api/cms/schema`).
+When the config names a collection or field that your PocketBase schema does not have, the CMS shows a warning at the top of the screen and ignores that setting. It checks this after sign-in, against the schema from `GET /api/cms/schema`.
+
+### Sign-in and navigation
+
+Only `users` accounts with `role = "editor"` can sign in; anyone else is signed out again with a message. If an editor's account is deleted or loses the role, the CMS signs them out on the next start. The session is kept in the browser's local storage, so it survives a reload and signing out in one tab signs out every tab.
+
+"Forgot your password?" calls PocketBase's own password reset request for `users`. PocketBase sends the email, so configure its mail settings (SMTP) and, if you like, the "Reset password" template under the `users` collection's options in the dashboard. The link in the default template opens PocketBase's own page for setting a new password. The CMS shows the same confirmation whether or not the address has an account.
+
+The sidebar lists the collections in `collections`, grouped by `nav`. Collections that `nav` does not list are appended to its last group; without `nav` they form one group in config order. After sign-in the CMS opens the first collection in the sidebar. `icon` takes one of these Lucide icon names, and any other name shows `file-text`: `award`, `bell`, `book-open`, `box`, `briefcase`, `building`, `calendar`, `camera`, `clipboard-list`, `coffee`, `file`, `file-text`, `folder`, `gift`, `globe`, `graduation-cap`, `handshake`, `heart`, `house`, `image`, `images`, `info`, `layers`, `layout-grid`, `link`, `list`, `mail`, `map`, `map-pin`, `megaphone`, `message-square`, `newspaper`, `package`, `pen-line`, `phone`, `quote`, `rss`, `settings`, `shopping-bag`, `star`, `store`, `tag`, `ticket`, `trophy`, `user`, `users`, `utensils`, `video`.
+
+### List screens
+
+A collection's screen is a table of its records.
+
+- **Columns** are `list.columns`, with the labels from `fields`. Without it, the list shows the title field (`titleField`, or the first text field), the publish state if the collection has `status`, and `updated` if it has that field. The title links to the record. Images are shown as thumbnails and related records by name.
+- **Search** matches the fields in `list.search` (by default the title field) for the typed text.
+- **Filter**: with `status`, the list can be narrowed to published, scheduled (only with `publishedAtField`) or draft records.
+- **Sort**: the order is `list.sort`, or else newest `updated` first. Selecting the header of a date column sorts by that date, newest first, and selecting it again reverses the order.
+- **Pages** hold `list.perPage` records (30 by default).
+
+The page, search, filter and sort are kept in the URL, so reloading and going back keep them. A localized field shows, searches and sorts the first locale in `locales`. A collection with `singleton: true` has no list: the CMS opens its one record.
 
 ## PocketBase hooks
 
@@ -100,7 +120,11 @@ app := pocketbase.New()
 pbcms.Register(app)
 ```
 
-`pbcms.Register` replaces `pbcms_schema.pb.js`, `pbcms_sanitize.pb.js` and `pbcms_media_urls.pb.js`, with the same answers and the same environment variables (`PBCMS_CONFIG_PATH`, `PBCMS_PUBLIC_URL`): it adds `GET /api/cms/schema`, sanitizes `editor` fields on save with the same allowlist, and sanitizes them again in responses with image URLs looked up afresh. Don't install those three hooks as well. The Go sanitizer is a port of `hooks/pb_hooks/pbcms/html.cjs`; its tests run both on the same inputs and check that the output is the same. The other hooks are not in the package yet: until they are, register PocketBase's `jsvm` plugin and keep `pbcms_preview.pb.js` and `pbcms_notify.pb.js` in `pb_hooks/`, with the `pbcms/` folder they load, as [`tests/gopocketbase/main.go`](tests/gopocketbase/main.go) does.
+`pbcms.Register` replaces all the JavaScript hooks above, so don't install them as well. It reads the same environment variables (`PBCMS_CONFIG_PATH`, `PBCMS_PUBLIC_URL`, `PBCMS_PREVIEW_TOKEN_DURATION`, `PBCMS_NOTIFY_URL`, `PBCMS_NOTIFY_SECRET`):
+
+- It adds `GET /api/cms/schema` and the preview routes (`POST /api/cms/preview/{collection}/{id}/token` and `GET /api/cms/preview/{collection}/{id}`), with the same answers and the same checks. Preview tokens are the same in both, so one issued by the JavaScript hook works with the Go package and the other way round.
+- It notifies your site with the same request as `pbcms_notify.pb.js`.
+- It sanitizes `editor` fields on save with the same allowlist, and sanitizes them again in responses with image URLs looked up afresh. The Go sanitizer is a port of `hooks/pb_hooks/pbcms/html.cjs`; its tests run both on the same inputs and check that the output is the same.
 
 ## Development
 

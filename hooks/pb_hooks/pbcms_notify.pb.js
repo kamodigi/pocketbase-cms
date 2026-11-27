@@ -14,6 +14,8 @@
 // The request is sent after the change is committed, and waits at most 10 seconds for the answer. A
 // failure (no answer, a status other than 2xx, no secret, an unreadable CMS config) never fails the
 // save; it is written to PocketBase's logs. There are no retries.
+//
+// The Go version is pbcms/notify.go in the pbcms package; use one or the other, not both.
 
 onRecordCreateExecute(e => require(`${__hooks}/pbcms/notify.cjs`).capture(e, 'create'))
 onRecordUpdateExecute(e => require(`${__hooks}/pbcms/notify.cjs`).capture(e, 'update'))

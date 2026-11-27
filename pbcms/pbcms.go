@@ -10,9 +10,10 @@ import (
 	"ganigeorgiev.com/pocketbase/pocketbase/tools/hook"
 )
 
-// Register adds the CMS's endpoint and hooks to app: GET /api/cms/schema, sanitizing `editor` fields
-// on save, and sanitizing them again in responses with image URLs looked up afresh. Calling it again
-// replaces them instead of adding them twice.
+// Register adds the CMS's endpoints and hooks to app: GET /api/cms/schema, the preview routes,
+// notifications to the site, sanitizing `editor` fields on save, and sanitizing them again in
+// responses with image URLs looked up afresh. Calling it again replaces them instead of adding them
+// twice.
 func Register(app core.App) {
 	app.OnRecordCreate().Bind(&hook.Handler[*core.RecordEvent]{
 		Id:   "pbcmsSanitizeOnCreate",
@@ -26,10 +27,12 @@ func Register(app core.App) {
 		Id:   "pbcmsEditorFields",
 		Func: enrichEditorFields,
 	})
+	registerNotifyHooks(app)
 	app.OnServe().Bind(&hook.Handler[*core.ServeEvent]{
 		Id: "pbcmsRoutes",
 		Func: func(e *core.ServeEvent) error {
 			e.Router.GET("/api/cms/schema", schemaHandler)
+			registerPreviewRoutes(e)
 			return e.Next()
 		},
 	})

@@ -116,7 +116,10 @@
 			"additionalProperties": false,
 			"properties": {
 				"label": { "$ref": "#/$defs/label" },
-				"icon": { "type": "string", "description": "Lucide icon name, e.g. \"newspaper\"." },
+				"icon": {
+					"type": "string",
+					"description": "Lucide icon name for the sidebar, e.g. \"newspaper\". The CMS bundles a set of common icons (see the README); other names show \"file-text\"."
+				},
 				"singleton": { "type": "boolean", "description": "Exactly one record; the list screen is skipped." },
 				"titleField": {
 					"type": "string",

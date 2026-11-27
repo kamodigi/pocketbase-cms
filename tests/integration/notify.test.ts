@@ -73,7 +73,7 @@ async function failureLogFor(url: string, recordId: string) {
 	)
 }
 
-// hooks/pb_hooks/pbcms_notify.pb.js. PocketBase sends a notification before it answers the request
+// hooks/pb_hooks/pbcms_notify.pb.js, or pbcms/notify.go with PBCMS_POCKETBASE=go. PocketBase sends a notification before it answers the request
 // that made the change, so the receiver has it as soon as the call returns.
 describe('notifications to the site', () => {
 	describe('with PBCMS_NOTIFY_URL and PBCMS_NOTIFY_SECRET', () => {

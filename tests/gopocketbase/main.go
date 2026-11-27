@@ -31,8 +31,8 @@ func main() {
 	flags.StringVar(&publicDir, "publicDir", "./pb_public", "the directory to serve static files")
 	_ = app.RootCmd.ParseFlags(os.Args[1:])
 
-	// The example presets and the dev seed are JavaScript migrations, and the hooks not yet ported to
-	// Go are JavaScript too.
+	// The example presets and the dev seed are JavaScript migrations, and the tests add JavaScript
+	// hooks of their own.
 	jsvm.MustRegister(app, jsvm.Config{HooksDir: hooksDir, HooksWatch: hooksWatch, MigrationsDir: migrationsDir})
 	migratecmd.MustRegister(app, app.RootCmd, migratecmd.Config{Dir: migrationsDir, TemplateLang: migratecmd.TemplateLangJS})
 

@@ -38,7 +38,7 @@ const releaseArchs = new Map<string, string>([
 /**
 The JavaScript hooks that the Go package does in its place.
 */
-const hooksInGo = new Set(['pbcms_schema.pb.js'])
+const hooksInGo = new Set(['pbcms_preview.pb.js', 'pbcms_schema.pb.js'])
 
 const isGoBuild = process.env.PBCMS_POCKETBASE === 'go'
 

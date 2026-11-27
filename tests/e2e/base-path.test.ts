@@ -35,6 +35,7 @@ for (const folder of ['edit', 'sites/lantern-editor']) {
 			await page.getByRole('button', { name: 'Sign in' }).click()
 			await expect(page.getByRole('heading', { level: 1, name: 'Posts' })).toBeVisible()
 			await page.getByRole('navigation', { name: 'Main navigation' }).getByRole('link', { name: 'Stores' }).click()
+			await expect(page.getByRole('heading', { level: 1, name: 'Stores' })).toBeVisible()
 
 			await page.reload()
 			await expect(page).toHaveURL(`${server.url}/${folder}/#/collections/stores`)

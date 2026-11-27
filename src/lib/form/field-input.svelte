@@ -6,6 +6,7 @@
 	import { Label } from '#lib/components/ui/label/index.js'
 	import * as Select from '#lib/components/ui/select/index.js'
 	import { Textarea } from '#lib/components/ui/textarea/index.js'
+	import RichTextInput from '#lib/editor/rich-text-input.svelte'
 	import { parseDate } from '#lib/list/request.js'
 	import FileInput from '#lib/media/file-input.svelte'
 	import MediaInput from '#lib/media/media-input.svelte'
@@ -149,6 +150,22 @@
 				<span class="text-muted-foreground">{m.list_no_value()}</span>
 			{/if}
 		</p>
+	{:else if field.kind === 'richtext' && field.richText}
+		<span class="text-sm leading-none font-medium" id="{id}-label">{@render labelText()}</span>
+		<RichTextInput
+			id="{id}-input"
+			{describedBy}
+			fieldLabel={field.label}
+			{invalid}
+			labelledBy="{id}-label"
+			onchange={setValue}
+			readonly={field.readonly}
+			required={isRequired}
+			settings={field.richText}
+			{uiLocale}
+			value={typeof value === 'string' ? value : ''}
+		/>
+		{@render messages()}
 	{:else if field.kind === 'pending'}
 		<span class="text-sm leading-none font-medium">{field.label}</span>
 		<p class="text-muted-foreground text-sm">{m.record_field_pending()}</p>

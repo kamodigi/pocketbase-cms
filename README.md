@@ -108,6 +108,25 @@ This applies to every `file` field, with or without a media library. GIFs (which
 
 **The media library.** `media` names one collection, such as the `media` preset, as the library of images that every collection shares. When an image is uploaded to its `fileField`, the CMS saves the image's width and height in `widthField` and `heightField` and its type in `mimeField`, so replacing the image on its edit screen updates them too. A `relation` field to that collection with `widget: "media"` gets an image picker in place of the record picker: it shows the chosen images, and its dialog searches the library by the collection's title field (the alt text in the preset) and `list.search`, shows thumbnails, and uploads a new image with its alt text (required) and caption. The thumbnails use a size from the file field's `thumbs` between 120 and 480 pixels, such as `160x160f`, or else PocketBase's `100x100`. Fields with `autofill`, such as the preset's `uploadedBy`, are filled on upload too.
 
+### Rich text
+
+An `editor` field gets a rich text editor ([Tiptap](https://tiptap.dev)). The toolbar sets the text style (paragraph or heading), bold, italic, underline, strikethrough, inline code, links, lists, quotes, code blocks, dividers, alignment and text color, inserts images and tables, and undoes. Selecting text shows a small menu with the text styles and the link, and typing `/` at the start of an empty line opens a menu of blocks to insert; type on to narrow it, and pick one with the arrow keys and Enter. Headings get an `id` made from their text, so a page can link to `#…`. Links take `https://`, `http://`, `mailto:` and `tel:` URLs and paths such as `/about`; a bare domain such as `example.com` becomes `https://example.com`.
+
+Images come from the media library: the image button opens the same picker as an image field, where an image can also be uploaded. The editor inserts it as `<figure><img src="…" alt="…" width="…" height="…" data-media-id="…"></figure>`, with the alt text and size from the media record (or the image's own size when the record has none), so the page does not jump while it loads. Selecting an image shows a menu to give it a caption and a link. Without a media library, the editor has no images.
+
+`editor` in the config, at the top level for every rich text field or on one field, chooses what the editor offers. A field's own `features` or `headingLevels` replace the top-level ones.
+
+```json
+{ "editor": { "features": ["heading", "bold", "italic", "link", "bulletList", "image"], "headingLevels": [2, 3] } }
+```
+
+| Key             | Default     | Meaning                                                                                                                                                                                                                                                                         |
+| --------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `features`      | all         | Any of `heading`, `bold`, `italic`, `underline`, `strike`, `code`, `link`, `bulletList`, `orderedList`, `blockquote`, `codeBlock`, `horizontalRule`, `image`, `table`, `textColor`, `textAlign`. The editor drops the markup of the others, so an edited field loses it on save |
+| `headingLevels` | `[2, 3, 4]` | The heading levels offered. The page's title is usually its only `<h1>`                                                                                                                                                                                                         |
+
+Everything the editor writes is within the allowlist of the sanitizer that the hooks run on save (see [PocketBase hooks](#pocketbase-hooks)), so what you see is what is stored. `widget: "textarea"` on an `editor` field edits the HTML itself instead.
+
 ### Unsaved input
 
 While you type on an edit screen, the CMS keeps the changed fields in the browser's local storage, one draft per editor and record (the new-record screen has one per collection). Opening that screen again asks "You have unsaved changes. Restore them?"; the form can be used once you choose to restore or discard. A restore puts back only the changed fields and sends nothing until you save. Chosen files are not kept, since the browser cannot store them. The draft is removed when you save or delete the record, discard it, or undo the changes yourself. Signing out with the sign-out button removes all of that editor's drafts, so a shared computer keeps no unpublished text. A session that expires keeps them, so no input is lost. If the record has an `updated` field and was saved again after the draft was made, the question says so; you can still restore. If the browser's storage is full or blocked, the screens work without drafts.

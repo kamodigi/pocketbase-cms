@@ -39,6 +39,22 @@ export interface RelationTarget {
 }
 
 /**
+The media library as a relation target, for the rich text editor's image picker; undefined when the
+config has no media library or the schema lacks it.
+*/
+export function mediaTarget(
+	config: CmsConfig,
+	collections: SchemaCollection[],
+	uiLocale: string,
+): RelationTarget | undefined {
+	const library = mediaLibrary(config, collections)
+	const target = collections.find(item => item.name === library?.collection)
+	return library && target
+		? collectionTarget(config, target, nameKeys(config, target, undefined), library, uiLocale)
+		: undefined
+}
+
+/**
 The target of a relation field. `collections` is the schema of the CMS's collections.
 */
 export function relationTarget(
@@ -55,6 +71,18 @@ export function relationTarget(
 		return { baseLocale, collection: field.collectionId ?? '', defaultSort: '', nameKeys: keys }
 	}
 
+	const library = fieldConfig?.widget === 'media' ? mediaLibrary(config, collections) : undefined
+	return collectionTarget(config, target, keys, library?.collection === target.name ? library : undefined, uiLocale)
+}
+
+function collectionTarget(
+	config: CmsConfig,
+	target: SchemaCollection,
+	keys: string[],
+	media: MediaLibrary | undefined,
+	uiLocale: string,
+): RelationTarget {
+	const baseLocale = config.locales?.[0]
 	const list = buildListModel(config, target, uiLocale)
 	const names = new Set(target.fields.map(item => item.name))
 	// The field the user reads in the picker is searched, along with what the collection's list searches.
@@ -65,12 +93,11 @@ export function relationTarget(
 	}
 	const shown = keys.flatMap(key => resolve(key)).slice(0, 1)
 	const searchFields = [...new Set([...shown, ...list.searchFields])]
-	const library = fieldConfig?.widget === 'media' ? mediaLibrary(config, collections) : undefined
 	return {
 		baseLocale,
 		collection: target.name,
 		defaultSort: list.defaultSort,
-		media: library?.collection === target.name ? library : undefined,
+		media,
 		nameKeys: keys,
 		searchFields: searchFields.length > 0 ? searchFields : ['id'],
 	}

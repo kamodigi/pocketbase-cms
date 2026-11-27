@@ -71,7 +71,7 @@ PocketBase のスキーマに無いコレクションや項目を設定に書い
 }
 ```
 
-`previewUrl` の無いコレクションにはボタンを出しません。プレビューのフック `pbcms_preview.pb.js`（[PocketBase のフック](#pocketbase-のフック)を参照）が必要です。補助ライブラリはありません。ページは、次の説明に沿ってサイト側で実装します。
+`previewUrl` の無いコレクションにはボタンを出しません。プレビューのフック `pbcms_preview.pb.js`（[PocketBase のフック](#pocketbase-のフック)を参照）か、[Go パッケージ](#go-パッケージ)が必要です。補助ライブラリはありません。ページは、次の説明に沿ってサイト側で実装します。
 
 **ページが受け取るもの。** ボタンは新しいタブを開き、`previewUrl` に HTML のフォームを送ります。`POST` で、本文は `application/x-www-form-urlencoded` です。
 

@@ -71,7 +71,7 @@ Give a collection a `previewUrl`, the absolute `http` or `https` address of a pa
 }
 ```
 
-A collection without `previewUrl` has no button. It needs the preview hook, `pbcms_preview.pb.js` (see [PocketBase hooks](#pocketbase-hooks)). There is no helper library: your site implements the page from the description below.
+A collection without `previewUrl` has no button. It needs the preview hook, `pbcms_preview.pb.js` (see [PocketBase hooks](#pocketbase-hooks)), or the [Go package](#go-package). There is no helper library: your site implements the page from the description below.
 
 **What your page receives.** The button opens a new tab and submits an HTML form to `previewUrl`: a `POST` with an `application/x-www-form-urlencoded` body.
 

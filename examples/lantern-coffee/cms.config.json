@@ -1,6 +1,7 @@
 {
 	"version": 1,
 	"brand": { "name": "Lantern Coffee" },
+	"locales": ["en", "ja", "zh-Hans"],
 	"media": {
 		"collection": "media",
 		"fileField": "file",
@@ -11,7 +12,7 @@
 		"mimeField": "mime",
 		"compress": { "maxWidth": 1920, "quality": 0.85, "format": "webp" }
 	},
-	"nav": [{ "label": "Content", "items": ["posts", "stores", "about", "media"] }],
+	"nav": [{ "label": "Content", "items": ["posts", "events", "stores", "about", "media"] }],
 	"collections": {
 		"posts": {
 			"label": "Posts",
@@ -38,6 +39,27 @@
 				"pinned": { "label": "Pinned", "badge": "Pinned", "help": "Shown at the top of the list on the site." },
 				"draft": { "label": "Draft" },
 				"published_at": { "label": "Published at", "widget": "datetime", "help": "A future date schedules the post." }
+			}
+		},
+		"events": {
+			"label": "Events",
+			"icon": "calendar",
+			"titleField": "title",
+			"status": { "draftField": "draft", "publishedAtField": "published_at" },
+			"list": {
+				"columns": ["title", "starts_at", "$status", "updated"],
+				"sort": "-starts_at",
+				"perPage": 20
+			},
+			"form": { "main": ["title", "body"], "side": ["slug", "starts_at", "published_at", "draft", "cover"] },
+			"fields": {
+				"title": { "label": "Title", "localized": true },
+				"slug": { "label": "Slug", "widget": "slug", "slugFrom": "title" },
+				"body": { "label": "Body", "localized": true },
+				"cover": { "label": "Cover image", "widget": "media" },
+				"starts_at": { "label": "Starts at", "widget": "datetime" },
+				"draft": { "label": "Draft" },
+				"published_at": { "label": "Published at", "widget": "datetime", "help": "A future date schedules the event." }
 			}
 		},
 		"stores": {

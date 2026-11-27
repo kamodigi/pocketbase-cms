@@ -18,7 +18,8 @@
 	import { changedValues, draftKey, isSavedSince, readDraft, recordUpdated, removeDraft, writeDraft } from './draft'
 	import DraftPrompt from './draft-prompt.svelte'
 	import FieldInput from './field-input.svelte'
-	import { buildFormModel, type FormField } from './model'
+	import LocalizedInput from './localized-input.svelte'
+	import { buildFormModel, formEntries, type FormEntry, type FormField } from './model'
 	import { type FieldErrors, serverFieldErrors, validateField, validateForm } from './validate'
 	import { initialValues, recordPayload, slugify } from './values'
 
@@ -51,6 +52,8 @@
 	const isSingleton = untrack(() => Boolean(config.collections[collection]?.singleton))
 	const previewUrl = untrack(() => config.collections[collection]?.previewUrl)
 	const fields = [...model.main, ...model.side]
+	const mainEntries = formEntries(model.main)
+	const sideEntries = formEntries(model.side)
 
 	// The record as PocketBase last returned it, and the inputs as they were then.
 	let saved = $state(untrack(() => record))
@@ -72,6 +75,8 @@
 	let isSaving = $state(false)
 	let isDeleting = $state(false)
 	let isDeleteOpen = $state(false)
+	// The content locale whose tab is open in every localized input; the base locale first.
+	let contentLocale = $state(untrack(() => config.locales?.[0] ?? ''))
 	// A slug follows its source field until the user writes a slug of their own.
 	const slugFields = fields.filter(field => field.kind === 'slug' && field.slugFrom !== undefined)
 	let ownSlugs = $state(Object.fromEntries(slugFields.map(field => [field.name, values[field.name] !== ''])))
@@ -173,8 +178,11 @@
 	}
 
 	async function focusFirstError() {
+		// Opens the locale of the first field with an error, so that its input can take the focus.
+		const locale = fields.find(field => errors[field.name] !== undefined)?.localized?.locale
+		if (locale !== undefined) contentLocale = locale
 		await tick()
-		document.querySelector<HTMLElement>('[data-record-form] [aria-invalid="true"]')?.focus()
+		document.querySelector<HTMLElement>('[data-record-form] [aria-invalid="true"]:not([hidden] *)')?.focus()
 	}
 
 	// The prompt is gone with the choice; the keyboard goes on to the form.
@@ -285,6 +293,27 @@
 	{/each}
 {/snippet}
 
+{#snippet fieldInput(field: FormField)}
+	{@render fieldList([field])}
+{/snippet}
+
+{#snippet entryList(entries: FormEntry[])}
+	{#each entries as entry (entry.kind === 'field' ? entry.field.name : `$localized/${entry.base}`)}
+		{#if entry.kind === 'field'}
+			{@render fieldList([entry.field])}
+		{:else}
+			<LocalizedInput
+				{errors}
+				fields={entry.fields}
+				input={fieldInput}
+				label={entry.label}
+				{uiLocale}
+				bind:active={contentLocale}
+			/>
+		{/if}
+	{/each}
+{/snippet}
+
 <div class="grid gap-1">
 	{#if !isSingleton}
 		<a
@@ -326,11 +355,11 @@
 
 	<div class="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
 		<div class="grid gap-5">
-			{@render fieldList(model.main)}
+			{@render entryList(mainEntries)}
 		</div>
 		{#if model.side.some(field => saved || field.kind !== 'autodate')}
 			<section class="bg-card grid gap-5 rounded-xl border p-4" aria-label={m.record_details()}>
-				{@render fieldList(model.side)}
+				{@render entryList(sideEntries)}
 			</section>
 		{/if}
 	</div>

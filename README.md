@@ -59,6 +59,12 @@ A collection's screen is a table of its records.
 
 The page, search, filter and sort are kept in the URL, so reloading and going back keep them. A localized field shows, searches and sorts the first locale in `locales`. A collection with `singleton: true` has no list: the CMS opens its one record.
 
+### Localized content
+
+For content in several languages, list the content locales in `locales` (the first is the base locale) and keep one PocketBase field per locale, named `<name>_<locale>`: `title_en`, `title_ja`. A locale with a hyphen is written in lower case with an underscore, so `zh-Hans` becomes `title_zh_hans`. Then set `"localized": true` on the base name in `fields` (`"title": { "localized": true }`) and use the base name everywhere else in the config, such as in `titleField`, `form` and `list`.
+
+The edit screen shows such a field as one input with a tab per locale. The tabs of all localized inputs switch together, and the base locale opens first. Whether a locale must be filled in follows that field's `required` in PocketBase; when saving is refused, the CMS opens the locale of the first field with an error, and marks the tabs that have one. A locale in `locales` without its field in the schema is reported as a warning, and the input shows only the locales that exist. Shared values such as the slug, dates, images and the publish state are ordinary fields, so a record is published in every language at once. A slug made from a localized title uses the base locale. The language of the CMS itself is chosen separately (see the language menu) and does not change the open tab.
+
 ### Relation fields
 
 On the edit screen, a `relation` field shows the chosen records by name. "Choose …" opens a dialog that searches the related collection and picks one record, or several when the field's `maxSelect` is more than 1; several are saved in the order they were chosen.
@@ -241,12 +247,13 @@ Sign in at the CMS with `editor@example.com` / `password1234`. The PocketBase da
 
 `examples/lantern-coffee/` describes a fictional coffee roaster. Each preset directory holds its migrations and a `cms.config.json`. Copy what you need into your own site.
 
-| Collection | Type        | Notes                                                                                   |
-| ---------- | ----------- | --------------------------------------------------------------------------------------- |
-| `posts`    | Article     | Title, slug, rich text body, cover image, category, stores, draft flag and publish date |
-| `stores`   | List        | Flat records with a select field and a URL                                              |
-| `about`    | Single page | One record, created by the migration; editors can update it but not create or delete it |
-| `media`    | Media       | Image file, required alt text, caption, width and height                                |
+| Collection | Type        | Notes                                                                                                                    |
+| ---------- | ----------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `posts`    | Article     | Title, slug, rich text body, cover image, category, stores, draft flag and publish date                                  |
+| `events`   | Article     | The article type in three languages (`en`, `ja`, `zh-Hans`): localized title and body, shared slug, dates and draft flag |
+| `stores`   | List        | Flat records with a select field and a URL                                                                               |
+| `about`    | Single page | One record, created by the migration; editors can update it but not create or delete it                                  |
+| `media`    | Media       | Image file, required alt text, caption, width and height                                                                 |
 
 - `examples/lantern-coffee/pb_migrations/` holds the JavaScript migrations, including `users.role`. Put them in your PocketBase's `pb_migrations/`.
 - `examples/lantern-coffee/cms.config.json` is the matching config. Copy it to `pb_public/cms/config.json`.

@@ -10,12 +10,23 @@ import { titleFieldName } from '#lib/list/model.js'
 import { type RelationTarget, relationTarget } from '#lib/relation/target.js'
 import { m } from '#paraglide/messages.js'
 
+/**
+What the form shows in one place: a field, or the locales of a localized field as one input with
+locale tabs (decision 32).
+*/
+export type FormEntry =
+	{ base: string; fields: FormField[]; kind: 'localized'; label: string } | { field: FormField; kind: 'field' }
+
 export interface FormField {
 	config?: FieldConfig
 	field: SchemaField
 	help?: string
 	kind: InputKind
 	label: string
+	/**
+	For one locale of a localized field: the config's base name and the content locale.
+	*/
+	localized?: { base: string; locale: string }
 	/**
 	The PocketBase field name, which is also the key of its value.
 	*/
@@ -142,8 +153,7 @@ export function buildFormModel(
 		const key = configKeyOf.get(name) ?? name
 		const fieldConfig = fieldConfigs[key]
 		const baseLabel = resolveLabel(fieldConfig?.label, uiLocale, timestampLabels.get(name)?.() ?? key)
-		const locale = locales.find(item => localizedFieldName(key, item) === name)
-		const label = key === name ? baseLabel : `${baseLabel} (${locale})`
+		const locale = key === name ? undefined : locales.find(item => localizedFieldName(key, item) === name)
 		const kind = inputKind(field, fieldConfig)
 		return [
 			{
@@ -151,7 +161,8 @@ export function buildFormModel(
 				field,
 				help: fieldConfig?.help === undefined ? undefined : resolveLabel(fieldConfig.help, uiLocale, ''),
 				kind,
-				label,
+				label: baseLabel,
+				localized: locale === undefined ? undefined : { base: key, locale },
 				name,
 				options: (field.values ?? []).map(value => ({
 					label: resolveLabel(fieldConfig?.options?.[value], uiLocale, value),
@@ -174,12 +185,37 @@ export function buildFormModel(
 	const main = place(collection.form?.main)
 	const side = place(collection.form?.side)
 	// The rest goes to the end of main, except the timestamps, which are only shown and go to the side.
+	// The locales of a localized field stay together, in the order of `locales`.
 	for (const field of schema.fields) {
 		if (placed.has(field.name)) continue
-		;(field.type === 'autodate' ? side : main).push(...toField(field.name))
+		;(field.type === 'autodate' ? side : main).push(...place([configKeyOf.get(field.name) ?? field.name]))
 	}
 
 	return { autofill, main, side, titleField: resolveName(titleFieldName(config, schema)) }
+}
+
+/**
+The fields of one area as the form shows them: the locales of a localized field are put together in
+one entry, where its first locale is.
+*/
+export function formEntries(fields: FormField[]): FormEntry[] {
+	const entries: FormEntry[] = []
+	const groups = new Map<string, FormField[]>()
+	for (const field of fields) {
+		if (!field.localized) {
+			entries.push({ field, kind: 'field' })
+			continue
+		}
+		const group = groups.get(field.localized.base)
+		if (group) {
+			group.push(field)
+			continue
+		}
+		const created = [field]
+		groups.set(field.localized.base, created)
+		entries.push({ base: field.localized.base, fields: created, kind: 'localized', label: field.label })
+	}
+	return entries
 }
 
 /**

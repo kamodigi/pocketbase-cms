@@ -1,6 +1,6 @@
 import type { RecordModel } from 'pocketbase'
 
-import { render, screen, waitFor } from '@testing-library/svelte'
+import { render, screen, waitFor, within } from '@testing-library/svelte'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -393,5 +393,97 @@ describe('RecordForm', () => {
 
 		await waitFor(() => expect(navigation.goto).toHaveBeenCalled())
 		expect(drafts()).toEqual([])
+	})
+})
+
+describe('RecordForm with localized fields', () => {
+	const localizedConfig: CmsConfig = {
+		collections: {
+			pages: {
+				fields: {
+					body: { label: 'Body', localized: true },
+					slug: { label: 'Slug', slugFrom: 'title' },
+					title: { label: 'Title', localized: true },
+				},
+				form: { main: ['title', 'body', 'slug'] },
+				titleField: 'title',
+			},
+		},
+		locales: ['ja', 'en'],
+		version: 1,
+	}
+	const localizedSchema: SchemaCollection = {
+		fields: [
+			{ name: 'id', primaryKey: true, type: 'text' },
+			{ name: 'title_ja', required: true, type: 'text' },
+			{ name: 'title_en', required: true, type: 'text' },
+			{ name: 'body_ja', type: 'text' },
+			{ name: 'body_en', type: 'text' },
+			{ name: 'slug', type: 'text' },
+		],
+		name: 'pages',
+	}
+
+	function showLocalized() {
+		return render(RecordForm, {
+			collection: 'pages',
+			config: localizedConfig,
+			label: 'Pages',
+			schema: localizedSchema,
+			uiLocale: 'en',
+		})
+	}
+
+	it('shows one input with a tab per locale, and the tabs of all inputs switch together', async () => {
+		const user = userEvent.setup()
+		showLocalized()
+		const titleTabs = screen.getByRole('tablist', { name: 'Language of Title' })
+		expect(screen.getByRole('tablist', { name: 'Language of Body' })).toBeInTheDocument()
+		expect(screen.getAllByRole('tab').map(tab => tab.textContent?.trim())).toEqual([
+			'Japanese',
+			'English',
+			'Japanese',
+			'English',
+		])
+		// The base locale is open first, and only its input is shown.
+		expect(screen.getAllByRole('textbox', { name: /^Title/ })).toHaveLength(1)
+		await user.type(screen.getByRole('textbox', { name: /^Title/ }), 'Fuyu')
+		// The slug is made from the base locale.
+		expect(screen.getByRole('textbox', { name: /^Slug/ })).toHaveValue('fuyu')
+
+		await user.click(within(titleTabs).getByRole('tab', { name: 'English' }))
+		const english = screen.getByRole('textbox', { name: /^Title/ })
+		expect(english).toHaveValue('')
+		expect(english.closest('[role="tabpanel"]')).toHaveAttribute('lang', 'en')
+		// Body follows the open locale too.
+		expect(
+			within(screen.getByRole('tablist', { name: 'Language of Body' })).getByRole('tab', { name: 'English' }),
+		).toHaveAttribute('aria-selected', 'true')
+	})
+
+	it('opens the locale of the first field with an error, and marks its tab', async () => {
+		const user = userEvent.setup()
+		const fetch = serve(200, { id: 'n1', title_en: 'Winter', title_ja: 'Fuyu' })
+		showLocalized()
+		await user.type(screen.getByRole('textbox', { name: /^Title/ }), 'Fuyu')
+
+		await user.click(screen.getByRole('button', { name: 'Create' }))
+
+		const titleTabs = screen.getByRole('tablist', { name: 'Language of Title' })
+		const englishTab = within(titleTabs).getByRole('tab', { name: /^English/ })
+		expect(englishTab).toHaveAttribute('aria-selected', 'true')
+		expect(englishTab).toHaveTextContent('(has an error)')
+		const english = screen.getByRole('textbox', { name: /^Title/ })
+		expect(english).toHaveFocus()
+		expect(english).toHaveAccessibleDescription('This field is required.')
+		expect(fetch).not.toHaveBeenCalled()
+
+		await user.type(english, 'Winter')
+		expect(englishTab).not.toHaveTextContent('(has an error)')
+		await user.click(screen.getByRole('button', { name: 'Create' }))
+
+		await waitFor(() => expect(navigation.goto).toHaveBeenCalled())
+		expect(sent(fetch).body).toEqual({ body_en: '', body_ja: '', slug: 'fuyu', title_en: 'Winter', title_ja: 'Fuyu' })
+		expect(toasts.success).toHaveBeenCalledWith('Created “Fuyu”.')
 	})
 })

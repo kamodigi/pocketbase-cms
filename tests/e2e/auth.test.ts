@@ -48,7 +48,7 @@ test('an editor signs in, sees the navigation from the config, and signs out', a
 	await expect(page.getByRole('heading', { level: 1, name: 'Posts' })).toBeVisible()
 	const nav = page.getByRole('navigation', { name: 'Main navigation' })
 	await expect(nav.getByText('Content')).toBeVisible()
-	await expect(nav.getByRole('link')).toHaveText(['Posts', 'Stores', 'About page', 'Media'])
+	await expect(nav.getByRole('link')).toHaveText(['Posts', 'Events', 'Stores', 'About page', 'Media'])
 	await expect(nav.getByRole('link', { name: 'Posts' })).toHaveAttribute('aria-current', 'page')
 	// Only the current item is highlighted.
 	await expect(nav.locator('[data-active]')).toHaveCount(1)

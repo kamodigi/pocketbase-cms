@@ -51,11 +51,13 @@ The sidebar lists the collections in `collections`, grouped by `nav`. Collection
 
 The JavaScript hooks live in [`hooks/pb_hooks/`](hooks/pb_hooks). Copy the files you need, together with the `pbcms/` folder they load, into your PocketBase's `pb_hooks/`.
 
-| File                     | What it does                                                                                                                             |
-| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| `pbcms_sanitize.pb.js`   | Cleans the HTML of every `editor` field when a record is saved through PocketBase: from the CMS, the API, the dashboard or `app.save()`  |
-| `pbcms_media_urls.pb.js` | In API responses, cleans every `editor` field again and points each `<img data-media-id="…">` at the current file of that `media` record |
-| `pbcms_schema.pb.js`     | Adds `GET /api/cms/schema`, which gives signed-in editors the definitions of the collections the CMS manages                             |
+| File                     | What it does                                                                                                                                          |
+| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pbcms_sanitize.pb.js`   | Cleans the HTML of every `editor` field when a record is saved through PocketBase: from the CMS, the API, the dashboard or `app.save()`               |
+| `pbcms_media_urls.pb.js` | In API responses, cleans every `editor` field again and points each `<img data-media-id="…">` at the current file of that `media` record              |
+| `pbcms_schema.pb.js`     | Adds `GET /api/cms/schema`, which gives signed-in editors the definitions of the collections the CMS manages                                          |
+| `pbcms_preview.pb.js`    | Issues short-lived preview tokens to editors and adds `GET /api/cms/preview/{collection}/{id}`, which lets your site read one draft with such a token |
+| `pbcms_notify.pb.js`     | POSTs to your site when a record of a collection the CMS manages is created, updated or deleted                                                       |
 
 The sanitizer keeps the tags and attributes the CMS's editor writes (paragraphs, headings, lists, links, images, tables, text alignment and colors) and removes everything else, including scripts, event handlers and `javascript:` URLs. A rich text field longer than 200,000 characters is refused on save.
 
@@ -65,11 +67,52 @@ File URLs start with the `PBCMS_PUBLIC_URL` environment variable (for example `h
 
 `GET /api/cms/schema` answers only a `users` record with `role = "editor"`: 401 without a token, 403 for anyone else (superusers included; they have PocketBase's own `/api/collections`). It returns `{ "collections": [{ "id", "name", "type", "fields" }] }` for the collections your config names under `collections`, plus `media.collection`, in that order. The fields are PocketBase's own definitions without hidden fields; rules, indexes and auth settings are left out. Names that PocketBase lacks, and system collections such as `_superusers`, are skipped. The hook reads the config from `pb_public/cms/config.json` next to `pb_data` on every request, so a redeployed config takes effect at once. If your public folder lives elsewhere (`--publicDir`), set `PBCMS_CONFIG_PATH` to the file's path. Without a readable config the endpoint answers 500.
 
+The preview hook lets your site show a draft without ever seeing an editor's token. An editor calls `POST /api/cms/preview/{collection}/{id}/token` and gets `{ "token", "expiresAt" }`: a token for that one record, valid for 10 minutes (set `PBCMS_PREVIEW_TOKEN_DURATION` to a number of seconds to change it). It answers 401 without a sign-in, 403 for anyone but an editor, and 404 for a collection the CMS does not manage (the same ones as `GET /api/cms/schema`) or a missing record. Your site then calls `GET /api/cms/preview/{collection}/{id}` with `Authorization: Bearer <token>` and gets the record as PocketBase's record API returns it, drafts included, whatever the collection's view rule says, with `Cache-Control: no-store`. A missing, invalid or expired token gets 401, a token for another record 403, and a deleted record 404. A token is signed with the editor's own token key, so it stops working when the editor's password changes or the editor loses the role. It is not a PocketBase auth token and cannot be used as one.
+
 Saving through PocketBase is not the only way HTML gets into the database: records saved before the hooks were installed, restored backups, raw SQL, and a hook that changes a value after the sanitizer has run all skip the save-time check. That is why the media hook sanitizes every `editor` field in responses too. Install both hooks, even if you don't use `media`.
+
+### Notifications to your site
+
+`pbcms_notify.pb.js` lets your site rebuild or revalidate its pages when content changes. Set both environment variables of PocketBase; without `PBCMS_NOTIFY_URL` the hook does nothing.
+
+| Variable              | Value                                                                            |
+| --------------------- | -------------------------------------------------------------------------------- |
+| `PBCMS_NOTIFY_URL`    | Where to send the notification, such as `https://www.example.com/api/revalidate` |
+| `PBCMS_NOTIFY_SECRET` | A long random string that your site checks. Nothing is sent without it           |
+
+It covers the same collections as `GET /api/cms/schema` (the config's `collections` and `media.collection`, never system collections), however the record changes: the CMS, the API, the dashboard or `app.save()`. Each change is one `POST` with the secret in the `X-Pbcms-Secret` header and a JSON body:
+
+```json
+{
+	"collection": "posts",
+	"action": "update",
+	"old": { "id": "abc123def456ghi", "slug": "old-slug", "draft": false, "…": "…" },
+	"new": { "id": "abc123def456ghi", "slug": "new-slug", "draft": false, "…": "…" }
+}
+```
+
+`action` is `create`, `update` or `delete`. `old` and `new` are the stored record before and after the change; `old` is `null` for a create and `new` is `null` for a delete. They hold the fields the API returns, without hidden fields, without the email of an auth record that hides it, and without expanded relations. Drafts are notified too, whatever the collection's API rules say. Rich text is as stored, not as the API returns it (see the media hook above), so use the notification to find what changed and read the content to display from the API.
+
+Your endpoint should compare the header with its secret in constant time and answer with a 2xx status. Use its final URL: a redirected request may arrive without its body. PocketBase sends the notification after the change is committed, one at a time, and waits up to 10 seconds for the answer, so a slow endpoint slows down saving. A failure never undoes or fails the save: it is written to PocketBase's logs (Dashboard → Logs) as `pbcms: could not notify the site`, and the notification is not retried.
+
+### Go package
+
+If your PocketBase is built with Go, use the `pbcms` package instead of the JavaScript hooks it replaces. It is built against `ganigeorgiev.com/pocketbase/pocketbase`, PocketBase's module path since v0.41.
+
+```sh
+go get github.com/kamodigi/pocketbase-cms/pbcms
+```
+
+```go
+app := pocketbase.New()
+pbcms.Register(app)
+```
+
+`pbcms.Register` adds `GET /api/cms/schema`, with the same answers, the same checks and the same `PBCMS_CONFIG_PATH` as `pbcms_schema.pb.js`; don't install that hook as well. The other hooks are not in the package yet: until they are, register PocketBase's `jsvm` plugin and keep `pbcms_sanitize.pb.js`, `pbcms_media_urls.pb.js`, `pbcms_preview.pb.js` and `pbcms_notify.pb.js` in `pb_hooks/`, with the `pbcms/` folder they load, as [`tests/gopocketbase/main.go`](tests/gopocketbase/main.go) does.
 
 ## Development
 
-Requirements: Node.js 22 or later and pnpm.
+Requirements: Node.js 22 or later and pnpm. The Go package needs Go 1.27 or later.
 
 ```sh
 pnpm install
@@ -78,16 +121,23 @@ pnpm check    # type check
 pnpm lint     # prettier + eslint
 pnpm test     # unit tests
 pnpm build    # static build in build/
+go vet ./... && go test ./...   # the Go package
 ```
 
 ### Integration and E2E tests
 
-Both run against a real PocketBase: the official binary at the version in `compose.yaml` (downloaded once into `node_modules/.cache/pocketbase/`), with the example presets, the dev accounts and a fresh data directory that is deleted afterwards. Docker is not needed.
+Both run against a real PocketBase: the official binary at the version in `compose.yaml` (downloaded once from [PocketBase's releases](https://ganigeorgiev.com/pocketbase/pocketbase/releases) into `node_modules/.cache/pocketbase/` and checked against the release's checksums), with the example presets, the dev accounts and a fresh data directory that is deleted afterwards. Docker is not needed.
 
 ```sh
 pnpm test:integration                  # API rules and hooks, in tests/integration/
 pnpm exec playwright install chromium  # once, before the first E2E run
 pnpm build && pnpm test:e2e            # the built CMS in pb_public/cms/, in tests/e2e/
+```
+
+With `PBCMS_POCKETBASE=go`, the same tests run against a PocketBase built with Go and the `pbcms` package from `tests/gopocketbase/` (it needs Go) in place of the official binary, without the JavaScript hooks the package replaces. CI runs both.
+
+```sh
+PBCMS_POCKETBASE=go pnpm test:integration
 ```
 
 The E2E tests serve PocketBase on port 8091; set `E2E_PORT` to use another.
@@ -98,7 +148,7 @@ UI text lives in `messages/en.json` and `messages/ja.json` ([Paraglide JS](https
 
 ## Try it with a development PocketBase
 
-A `compose.yaml` runs the official PocketBase binary (v0.40.6; only the latest minor version is supported) with the example presets in `examples/`. It needs Docker Compose.
+A `compose.yaml` runs the official PocketBase binary (v0.42.3; only the latest minor version is supported, and `go.mod` names the same version) with the example presets in `examples/`. It needs Docker Compose.
 
 ```sh
 docker compose up -d --build   # PocketBase at http://localhost:8090

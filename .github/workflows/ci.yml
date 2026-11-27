@@ -42,12 +42,43 @@ jobs:
       - name: Build
         run: pnpm build
 
-  integration:
-    name: Integration test (PocketBase)
+  go:
+    name: Go package (vet, test)
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+
+      - name: gofmt
+        run: test -z "$(gofmt -l .)" || { gofmt -l .; exit 1; }
+
+      - run: go vet ./...
+
+      - run: go test ./...
+
+  integration:
+    # The same tests against the official binary with the JavaScript hooks, and against a
+    # PocketBase built with Go and the pbcms package (tests/gopocketbase/).
+    name: Integration test (PocketBase, ${{ matrix.pocketbase }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        pocketbase: [official, go]
+    env:
+      PBCMS_POCKETBASE: ${{ matrix.pocketbase }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - if: matrix.pocketbase == 'go'
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
 
       - uses: pnpm/action-setup@v6
 

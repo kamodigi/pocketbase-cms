@@ -51,11 +51,13 @@ PocketBase のスキーマに無いコレクションや項目を設定に書い
 
 JavaScript のフックは [`hooks/pb_hooks/`](hooks/pb_hooks) にあります。使うファイルを、読み込む `pbcms/` フォルダと一緒に、自分の PocketBase の `pb_hooks/` にコピーします。
 
-| ファイル                 | 役割                                                                                                                               |
-| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------- |
-| `pbcms_sanitize.pb.js`   | PocketBase を通して保存するときに、`editor` 型の項目の HTML を無害化する。CMS・API・ダッシュボード・`app.save()` のどれでも効く    |
-| `pbcms_media_urls.pb.js` | API の応答で、`editor` 型の項目をもう一度無害化し、`<img data-media-id="…">` の画像を、その `media` レコードの今のファイルに向ける |
-| `pbcms_schema.pb.js`     | `GET /api/cms/schema` を追加し、ログイン済みの編集者に、CMS が扱うコレクションの定義を返す                                         |
+| ファイル                 | 役割                                                                                                                                         |
+| ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pbcms_sanitize.pb.js`   | PocketBase を通して保存するときに、`editor` 型の項目の HTML を無害化する。CMS・API・ダッシュボード・`app.save()` のどれでも効く              |
+| `pbcms_media_urls.pb.js` | API の応答で、`editor` 型の項目をもう一度無害化し、`<img data-media-id="…">` の画像を、その `media` レコードの今のファイルに向ける           |
+| `pbcms_schema.pb.js`     | `GET /api/cms/schema` を追加し、ログイン済みの編集者に、CMS が扱うコレクションの定義を返す                                                   |
+| `pbcms_preview.pb.js`    | 編集者に期限付きのプレビュー用トークンを発行し、`GET /api/cms/preview/{collection}/{id}` を追加する。サイトはこのトークンで下書きを1件読める |
+| `pbcms_notify.pb.js`     | CMS が扱うコレクションのレコードの作成・更新・削除を、サイトに POST で知らせる                                                               |
 
 サニタイズでは、CMS のエディタが書き出すタグと属性（段落、見出し、リスト、リンク、画像、表、文字の揃えと色）だけを残し、script、イベントハンドラ、`javascript:` の URL などはすべて取り除きます。200,000 文字を超えるリッチテキストは保存できません。
 
@@ -65,11 +67,52 @@ CMS は本文中の画像を `<img src="…" data-media-id="<media のレコー�
 
 `GET /api/cms/schema` に答えるのは `role = "editor"` の `users` のレコードだけです。トークンが無ければ 401、それ以外のアカウントは 403 になります（superuser も 403 です。superuser は PocketBase の `/api/collections` を使えます）。返すのは `{ "collections": [{ "id", "name", "type", "fields" }] }` で、設定の `collections` に書いたコレクションと `media.collection` を、その順に並べます。項目は PocketBase の定義そのままで、hidden の項目は除きます。ルール・インデックス・認証の設定は含めません。PocketBase に無い名前と、`_superusers` などのシステムのコレクションは飛ばします。フックは設定を、リクエストのたびに `pb_data` の隣の `pb_public/cms/config.json` から読むので、設定を入れ替えればすぐに反映されます。公開フォルダを別の場所に置いている場合（`--publicDir`）は、環境変数 `PBCMS_CONFIG_PATH` にそのファイルのパスを指定してください。設定を読めないときは 500 を返します。
 
+プレビューのフックを使うと、サイトに編集者のトークンを渡さずに下書きを見せられます。編集者が `POST /api/cms/preview/{collection}/{id}/token` を呼ぶと `{ "token", "expiresAt" }` が返ります。トークンはそのレコード1件だけに使え、10分で切れます（変えるには環境変数 `PBCMS_PREVIEW_TOKEN_DURATION` に秒数を指定します）。ログインしていなければ 401、編集者以外は 403、CMS が扱わないコレクション（`GET /api/cms/schema` と同じもの）や無いレコードは 404 になります。サイトは `GET /api/cms/preview/{collection}/{id}` を `Authorization: Bearer <token>` を付けて呼ぶと、コレクションの閲覧ルールにかかわらず、下書きを含めて PocketBase のレコードの API と同じ形でレコードを受け取ります。応答には `Cache-Control: no-store` が付きます。トークンが無い・正しくない・期限切れなら 401、別のレコードのトークンなら 403、レコードが消されていれば 404 です。トークンは編集者自身のトークンキーで署名するので、編集者のパスワードが変わったり、編集者の役割が外れたりすると、すぐに使えなくなります。PocketBase の認証トークンではなく、その代わりにもなりません。
+
 データベースに HTML が入る経路は、PocketBase を通した保存だけではありません。フックを入れる前に保存したレコード、バックアップからの復元、生の SQL、サニタイズのあとで値を書き換える別のフックは、保存時の無害化を通りません。そのため、メディアのフックは応答でもすべての `editor` 型の項目を無害化します。`media` を使わない場合も、両方のフックを入れてください。
+
+### サイトへの通知
+
+`pbcms_notify.pb.js` を使うと、内容が変わったときにサイトでページを作り直したり再検証したりできます。PocketBase の環境変数を2つとも設定してください。`PBCMS_NOTIFY_URL` が無ければ、フックは何もしません。
+
+| 環境変数              | 値                                                                   |
+| --------------------- | -------------------------------------------------------------------- |
+| `PBCMS_NOTIFY_URL`    | 通知の送り先。例：`https://www.example.com/api/revalidate`           |
+| `PBCMS_NOTIFY_SECRET` | サイト側で確かめる長いランダムな文字列。設定が無ければ何も送りません |
+
+対象は `GET /api/cms/schema` と同じコレクション（設定の `collections` と `media.collection`。システムのコレクションは含みません）で、CMS・API・ダッシュボード・`app.save()` のどれで変えても通知します。変更1件につき `POST` を1回送り、`X-Pbcms-Secret` ヘッダーに秘密の文字列を入れ、本文は次の JSON です。
+
+```json
+{
+	"collection": "posts",
+	"action": "update",
+	"old": { "id": "abc123def456ghi", "slug": "old-slug", "draft": false, "…": "…" },
+	"new": { "id": "abc123def456ghi", "slug": "new-slug", "draft": false, "…": "…" }
+}
+```
+
+`action` は `create`・`update`・`delete` のどれかです。`old` と `new` は変更前と変更後の保存されたレコードで、作成では `old` が、削除では `new` が `null` になります。中身は API が返す項目で、hidden の項目、メールアドレスを非公開にしている認証レコードのメールアドレス、expand したリレーションは含みません。コレクションの API ルールにかかわらず、下書きも通知します。リッチテキストは API の応答ではなく保存されたままの値です（上のメディアのフックを参照）。通知は何が変わったかを知るために使い、表示する内容は API から読んでください。
+
+受け口では、ヘッダーの値を秘密の文字列と定数時間で比べ、2xx のステータスを返してください。送り先にはリダイレクトされない最終の URL を指定してください（リダイレクトされると本文が届かないことがあります）。PocketBase は変更を確定したあとに通知を1件ずつ送り、応答を最大10秒待つので、受け口が遅いと保存も遅くなります。通知に失敗しても、保存は取り消されず、エラーにもなりません。PocketBase のログ（ダッシュボードの Logs）に `pbcms: could not notify the site` として残り、再送はしません。
+
+### Go パッケージ
+
+Go で組み立てた PocketBase では、JavaScript のフックの代わりに `pbcms` パッケージを使います。PocketBase の v0.41 からのモジュールのパス `ganigeorgiev.com/pocketbase/pocketbase` に合わせてあります。
+
+```sh
+go get github.com/kamodigi/pocketbase-cms/pbcms
+```
+
+```go
+app := pocketbase.New()
+pbcms.Register(app)
+```
+
+`pbcms.Register` は `GET /api/cms/schema` を追加します。応答・権限の判定・`PBCMS_CONFIG_PATH` の扱いは `pbcms_schema.pb.js` と同じなので、このフックは一緒に入れないでください。ほかのフックはまだパッケージにありません。それまでは、[`tests/gopocketbase/main.go`](tests/gopocketbase/main.go) と同じように PocketBase の `jsvm` プラグインを登録し、`pbcms_sanitize.pb.js`・`pbcms_media_urls.pb.js`・`pbcms_preview.pb.js`・`pbcms_notify.pb.js` を、それらが読み込む `pbcms/` フォルダと一緒に `pb_hooks/` に置いてください。
 
 ## 開発
 
-必要なもの：Node.js 22 以上と pnpm
+必要なもの：Node.js 22 以上と pnpm。Go パッケージには Go 1.27 以上が必要です。
 
 ```sh
 pnpm install
@@ -78,16 +121,23 @@ pnpm check    # 型チェック
 pnpm lint     # prettier と eslint
 pnpm test     # ユニットテスト
 pnpm build    # build/ に静的ファイルを書き出す
+go vet ./... && go test ./...   # Go パッケージ
 ```
 
 ### 統合テストと E2E
 
-どちらも本物の PocketBase に対して動きます。`compose.yaml` のバージョンの公式バイナリ（初回に `node_modules/.cache/pocketbase/` にダウンロード）を、例のプリセットと開発用のアカウントつきで、使い捨てのデータディレクトリで起動します。終わるとデータは消えます。Docker は不要です。
+どちらも本物の PocketBase に対して動きます。`compose.yaml` のバージョンの公式バイナリ（初回に [PocketBase のリリース](https://ganigeorgiev.com/pocketbase/pocketbase/releases)から `node_modules/.cache/pocketbase/` にダウンロードし、リリースのチェックサムで確かめる）を、例のプリセットと開発用のアカウントつきで、使い捨てのデータディレクトリで起動します。終わるとデータは消えます。Docker は不要です。
 
 ```sh
 pnpm test:integration                  # API ルールとフック（tests/integration/）
 pnpm exec playwright install chromium  # 最初の E2E の前に一度だけ
 pnpm build && pnpm test:e2e            # pb_public/cms/ に置いたビルド済みの CMS（tests/e2e/）
+```
+
+`PBCMS_POCKETBASE=go` を付けると、同じテストを、公式バイナリの代わりに `tests/gopocketbase/` の Go で組み立てた PocketBase（`pbcms` パッケージ入り。Go が必要）に対して動かします。パッケージが置き換える JavaScript のフックは入れません。CI では両方を動かします。
+
+```sh
+PBCMS_POCKETBASE=go pnpm test:integration
 ```
 
 E2E の PocketBase はポート 8091 で動きます。別のポートにするときは `E2E_PORT` を設定します。
@@ -98,7 +148,7 @@ E2E の PocketBase はポート 8091 で動きます。別のポートにする�
 
 ## 開発用の PocketBase で試す
 
-`compose.yaml` は、公式バイナリの PocketBase（v0.40.6。正式に対応するのは最新のマイナーバージョンだけ）を、`examples/` のプリセットつきで起動します。Docker Compose が必要です。
+`compose.yaml` は、公式バイナリの PocketBase（v0.42.3。正式に対応するのは最新のマイナーバージョンだけ。`go.mod` も同じバージョン）を、`examples/` のプリセットつきで起動します。Docker Compose が必要です。
 
 ```sh
 docker compose up -d --build   # PocketBase: http://localhost:8090

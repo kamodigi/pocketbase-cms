@@ -100,7 +100,7 @@ app := pocketbase.New()
 pbcms.Register(app)
 ```
 
-`pbcms.Register` adds `GET /api/cms/schema`, with the same answers, the same checks and the same `PBCMS_CONFIG_PATH` as `pbcms_schema.pb.js`; don't install that hook as well. The other hooks are not in the package yet: until they are, register PocketBase's `jsvm` plugin and keep `pbcms_sanitize.pb.js`, `pbcms_media_urls.pb.js`, `pbcms_preview.pb.js` and `pbcms_notify.pb.js` in `pb_hooks/`, with the `pbcms/` folder they load, as [`tests/gopocketbase/main.go`](tests/gopocketbase/main.go) does.
+`pbcms.Register` adds `GET /api/cms/schema`, with the same answers, the same checks and the same `PBCMS_CONFIG_PATH` as `pbcms_schema.pb.js`, and notifies your site like `pbcms_notify.pb.js`, with the same request and the same `PBCMS_NOTIFY_URL` and `PBCMS_NOTIFY_SECRET`; don't install those hooks as well. The other hooks are not in the package yet: until they are, register PocketBase's `jsvm` plugin and keep `pbcms_sanitize.pb.js`, `pbcms_media_urls.pb.js` and `pbcms_preview.pb.js` in `pb_hooks/`, with the `pbcms/` folder they load, as [`tests/gopocketbase/main.go`](tests/gopocketbase/main.go) does.
 
 ## Development
 

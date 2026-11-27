@@ -10,8 +10,10 @@ import (
 	"ganigeorgiev.com/pocketbase/pocketbase/tools/hook"
 )
 
-// Register adds the CMS's endpoints to app. Calling it again replaces them instead of adding them twice.
+// Register adds the CMS's endpoints and hooks to app. Calling it again replaces them instead of
+// adding them twice.
 func Register(app core.App) {
+	registerNotifyHooks(app)
 	app.OnServe().Bind(&hook.Handler[*core.ServeEvent]{
 		Id: "pbcmsRoutes",
 		Func: func(e *core.ServeEvent) error {

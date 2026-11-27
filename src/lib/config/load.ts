@@ -1,7 +1,7 @@
 import { type ConfigResult, validateConfig } from './validate'
 
 /**
-Where the CMS reads its config: next to index.html, i.e. pb_public/cms/config.json.
+Where the CMS reads its config: next to index.html, e.g. pb_public/cms/config.json.
 */
 export const configUrl = 'config.json'
 
@@ -19,7 +19,7 @@ export async function loadConfig(fetchFn: typeof fetch, url: string = configUrl)
 	if (!response.ok) {
 		return failure(
 			response.status === 404
-				? `${url} was not found. Copy your cms.config.json to pb_public/cms/config.json.`
+				? `${url} was not found. Copy your cms.config.json to config.json next to the CMS's index.html.`
 				: `Could not fetch ${url}: HTTP ${response.status}`,
 		)
 	}

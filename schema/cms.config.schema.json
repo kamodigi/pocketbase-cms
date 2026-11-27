@@ -14,7 +14,10 @@
 			"additionalProperties": false,
 			"properties": {
 				"name": { "$ref": "#/$defs/label" },
-				"logo": { "type": "string", "description": "Path relative to /cms/ or an absolute URL." },
+				"logo": {
+					"type": "string",
+					"description": "Path relative to the CMS's folder (such as pb_public/cms/) or an absolute URL."
+				},
 				"favicon": { "type": "string" },
 				"accent": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$" }
 			}

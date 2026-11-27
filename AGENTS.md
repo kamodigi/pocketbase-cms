@@ -1,6 +1,6 @@
 # AGENTS.md
 
-pocketbase-cms is a public, MIT-licensed admin UI for PocketBase: a Svelte 5 + SvelteKit static SPA (hash router, served from `pb_public/cms/`).
+pocketbase-cms is a public, MIT-licensed admin UI for PocketBase: a Svelte 5 + SvelteKit static SPA (hash router, served from `pb_public/cms/` or any other folder of `pb_public/`; the build uses relative URLs).
 
 ## Rules
 

@@ -13,25 +13,39 @@ It reads your collection schema at runtime and builds the list and edit screens 
 
 ## How it will work
 
-- The CMS is a static single-page app. You copy it into PocketBase's `pb_public/cms/` and open `https://<your-pocketbase>/cms/`.
+- The CMS is a static single-page app. You copy it into a folder of PocketBase's `pb_public/`, such as `pb_public/cms/`, and open `https://<your-pocketbase>/cms/`.
 - Editors sign in with a PocketBase `users` account that has `role = "editor"`. PocketBase's API rules stay the real access control.
 - Field inputs come from your collection schema. A `cms.config.json` file next to the app only sets labels, ordering, list columns and similar presentation details.
 - A small PocketBase hook (JavaScript `pb_hooks` or a Go package) exposes the schema to editors, sanitizes rich text on save, and can notify your site when content changes.
 
 ## Installation
 
-Every [release](https://github.com/kamodigi/pocketbase-cms/releases) comes in two forms. Replace `0.1.0` below with the version you want.
+Every [release](https://github.com/kamodigi/pocketbase-cms/releases) comes in two forms. Replace `0.2.0` below with the version you want.
 
 **Docker image.** `ghcr.io/kamodigi/pocketbase-cms` holds the built CMS in `/dist`. You never run it; your PocketBase image copies the files out of it:
 
 ```dockerfile
-COPY --from=ghcr.io/kamodigi/pocketbase-cms:0.1.0 /dist /pb/pb_public/cms
+COPY --from=ghcr.io/kamodigi/pocketbase-cms:0.2.0 /dist /pb/pb_public/cms
 COPY cms.config.json /pb/pb_public/cms/config.json
 ```
 
 The image holds the CMS only. Take the [PocketBase hooks](#pocketbase-hooks) from the zip of the same version, or use the Go package.
 
-**Zip.** `pocketbase-cms_0.1.0.zip`, attached to the release, holds `cms/` (the built CMS), `pb_hooks/` (the JavaScript hooks) and the license. Copy `cms/` to `pb_public/cms/`, the contents of `pb_hooks/` into your `pb_hooks/`, and your config to `pb_public/cms/config.json`. When you upgrade, replace `pb_public/cms/` as a whole, so no files of the old version are left behind.
+**Zip.** `pocketbase-cms_0.2.0.zip`, attached to the release, holds `cms/` (the built CMS), `pb_hooks/` (the JavaScript hooks) and the license. Copy `cms/` to `pb_public/cms/`, the contents of `pb_hooks/` into your `pb_hooks/`, and your config to `pb_public/cms/config.json`. When you upgrade, replace `pb_public/cms/` as a whole, so no files of the old version are left behind.
+
+### Another folder
+
+`cms` is only the usual name. The same build works in any folder of `pb_public/` (since version 0.2.0), because it finds its files and `config.json` relative to its own address. To serve it at `https://<your-pocketbase>/edit/`, for example:
+
+```dockerfile
+COPY --from=ghcr.io/kamodigi/pocketbase-cms:0.2.0 /dist /pb/pb_public/edit
+COPY cms.config.json /pb/pb_public/edit/config.json
+ENV PBCMS_CONFIG_PATH=/pb/pb_public/edit/config.json
+```
+
+With the zip, copy `cms/` to `pb_public/edit/` and the config to `pb_public/edit/config.json`.
+
+The [hooks and the Go package](#pocketbase-hooks) read the config from `pb_public/cms/config.json` unless the `PBCMS_CONFIG_PATH` environment variable names another file, so set it whenever the folder is not `cms`. Wherever this README says `pb_public/cms/`, use your folder. Don't use `api` or `_` as its name: PocketBase serves its own pages there.
 
 ## Configuration
 
@@ -201,7 +215,7 @@ The CMS stores an image in rich text as `<img src="…" data-media-id="<media re
 
 File URLs start with the `PBCMS_PUBLIC_URL` environment variable (for example `https://pb.example.com`), or with the Application URL in PocketBase's settings when the variable is not set. Request headers such as `X-Forwarded-Host` are not used, because clients can forge them.
 
-`GET /api/cms/schema` answers only a `users` record with `role = "editor"`: 401 without a token, 403 for anyone else (superusers included; they have PocketBase's own `/api/collections`). It returns `{ "collections": [{ "id", "name", "type", "fields" }] }` for the collections your config names under `collections`, plus `media.collection`, in that order. The fields are PocketBase's own definitions without hidden fields; rules, indexes and auth settings are left out. Names that PocketBase lacks, and system collections such as `_superusers`, are skipped. The hook reads the config from `pb_public/cms/config.json` next to `pb_data` on every request, so a redeployed config takes effect at once. If your public folder lives elsewhere (`--publicDir`), set `PBCMS_CONFIG_PATH` to the file's path. Without a readable config the endpoint answers 500.
+`GET /api/cms/schema` answers only a `users` record with `role = "editor"`: 401 without a token, 403 for anyone else (superusers included; they have PocketBase's own `/api/collections`). It returns `{ "collections": [{ "id", "name", "type", "fields" }] }` for the collections your config names under `collections`, plus `media.collection`, in that order. The fields are PocketBase's own definitions without hidden fields; rules, indexes and auth settings are left out. Names that PocketBase lacks, and system collections such as `_superusers`, are skipped. The hook reads the config from `pb_public/cms/config.json` next to `pb_data` on every request, so a redeployed config takes effect at once. If the CMS is in [another folder](#another-folder), or your public folder lives elsewhere (`--publicDir`), set `PBCMS_CONFIG_PATH` to the file's path. Without a readable config the endpoint answers 500.
 
 The preview hook lets your site show a draft without ever seeing an editor's token. An editor calls `POST /api/cms/preview/{collection}/{id}/token` and gets `{ "token", "expiresAt" }`: a token for that one record, valid for 10 minutes (set `PBCMS_PREVIEW_TOKEN_DURATION` to a number of seconds to change it). It answers 401 without a sign-in, 403 for anyone but an editor, and 404 for a collection the CMS does not manage (the same ones as `GET /api/cms/schema`) or a missing record. Your site then calls `GET /api/cms/preview/{collection}/{id}` with `Authorization: Bearer <token>` and gets the record as PocketBase's record API returns it, drafts included, whatever the collection's view rule says, with `Cache-Control: no-store`. A missing, invalid or expired token gets 401, a token for another record 403, and a deleted record 404. A token is signed with the editor's own token key, so it stops working when the editor's password changes or the editor loses the role. It is not a PocketBase auth token and cannot be used as one.
 
@@ -260,7 +274,7 @@ pnpm dev      # dev server at http://localhost:5173/cms/
 pnpm check    # type check
 pnpm lint     # prettier + eslint
 pnpm test     # unit tests
-pnpm build    # static build in build/
+pnpm build    # static build in build/, for any folder of pb_public/
 go vet ./... && go test ./...   # the Go package
 ```
 
@@ -271,7 +285,7 @@ Both run against a real PocketBase: the official binary at the version in `compo
 ```sh
 pnpm test:integration                  # API rules and hooks, in tests/integration/
 pnpm exec playwright install chromium  # once, before the first E2E run
-pnpm build && pnpm test:e2e            # the built CMS in pb_public/cms/, in tests/e2e/
+pnpm build && pnpm test:e2e            # the built CMS in pb_public/cms/ and other folders, in tests/e2e/
 ```
 
 With `PBCMS_POCKETBASE=go`, the same tests run against a PocketBase built with Go and the `pbcms` package from `tests/gopocketbase/` (it needs Go) in place of the official binary, without the JavaScript hooks the package replaces. CI runs both.
@@ -321,21 +335,21 @@ Sign in at the CMS with `editor@example.com` / `password1234`. The PocketBase da
 
 The CMS, the JavaScript hooks and the Go package share one version, following [Semantic Versioning](https://semver.org). While the major version is 0, a minor release may break compatibility and a patch release does not; read the release notes before upgrading.
 
-| What             | Name for version 0.1.0                                    |
+| What             | Name for version 0.2.0                                    |
 | ---------------- | --------------------------------------------------------- |
-| Git tag          | `v0.1.0` (`go get …/pbcms@v0.1.0` uses it too)            |
-| Docker image     | `ghcr.io/kamodigi/pocketbase-cms:0.1.0` (no `latest` tag) |
-| Zip on a release | `pocketbase-cms_0.1.0.zip`                                |
+| Git tag          | `v0.2.0` (`go get …/pbcms@v0.2.0` uses it too)            |
+| Docker image     | `ghcr.io/kamodigi/pocketbase-cms:0.2.0` (no `latest` tag) |
+| Zip on a release | `pocketbase-cms_0.2.0.zip`                                |
 
 The tag is the only place the version is written (`version` in `package.json` stays `0.0.0`). To publish a release, tag a commit on `main` and push the tag:
 
 ```sh
 git fetch origin
-git tag -a v0.1.0 -m v0.1.0 origin/main
-git push origin v0.1.0
+git tag -a v0.2.0 -m v0.2.0 origin/main
+git push origin v0.2.0
 ```
 
-The [release workflow](.github/workflows/release.yml) runs all of CI, then pushes the image (`linux/amd64` and `linux/arm64`) and creates the GitHub release with the zip. A tag with a suffix, such as `v0.1.0-rc.1`, becomes a pre-release. Never move or reuse a published tag: Go's module proxy keeps the first content it saw. Version 2 needs a `/v2` module path in `go.mod` first, so the packaging script refuses it until then.
+The [release workflow](.github/workflows/release.yml) runs all of CI, then pushes the image (`linux/amd64` and `linux/arm64`) and creates the GitHub release with the zip. A tag with a suffix, such as `v0.2.0-rc.1`, becomes a pre-release. Never move or reuse a published tag: Go's module proxy keeps the first content it saw. Version 2 needs a `/v2` module path in `go.mod` first, so the packaging script refuses it until then.
 
 GHCR creates a new package as private. After the first release, a maintainer has to make it public once, in the package's settings on GitHub.
 

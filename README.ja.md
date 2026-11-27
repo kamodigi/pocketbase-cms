@@ -128,7 +128,7 @@ app := pocketbase.New()
 pbcms.Register(app)
 ```
 
-`pbcms.Register` は `GET /api/cms/schema` を追加します。応答・権限の判定・`PBCMS_CONFIG_PATH` の扱いは `pbcms_schema.pb.js` と同じなので、このフックは一緒に入れないでください。ほかのフックはまだパッケージにありません。それまでは、[`tests/gopocketbase/main.go`](tests/gopocketbase/main.go) と同じように PocketBase の `jsvm` プラグインを登録し、`pbcms_sanitize.pb.js`・`pbcms_media_urls.pb.js`・`pbcms_preview.pb.js`・`pbcms_notify.pb.js` を、それらが読み込む `pbcms/` フォルダと一緒に `pb_hooks/` に置いてください。
+`pbcms.Register` は `GET /api/cms/schema` とプレビューのルート（`POST /api/cms/preview/{collection}/{id}/token` と `GET /api/cms/preview/{collection}/{id}`）を追加します。応答・権限の判定・環境変数（`PBCMS_CONFIG_PATH`・`PBCMS_PREVIEW_TOKEN_DURATION`）の扱いは `pbcms_schema.pb.js`・`pbcms_preview.pb.js` と同じなので、これらのフックは一緒に入れないでください。プレビュー用トークンも同じものなので、JavaScript のフックが発行したトークンは Go パッケージでも使え、その逆も使えます。ほかのフックはまだパッケージにありません。それまでは、[`tests/gopocketbase/main.go`](tests/gopocketbase/main.go) と同じように PocketBase の `jsvm` プラグインを登録し、`pbcms_sanitize.pb.js`・`pbcms_media_urls.pb.js`・`pbcms_notify.pb.js` を、それらが読み込む `pbcms/` フォルダと一緒に `pb_hooks/` に置いてください。
 
 ## 開発
 

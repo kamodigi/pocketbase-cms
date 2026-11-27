@@ -59,6 +59,55 @@ PocketBase のスキーマに無いコレクションや項目を設定に書い
 
 ページ・検索・絞り込み・並び順は URL に残るので、再読み込みや「戻る」をしても保たれます。言語ごとの項目は、`locales` の最初の言語の値を表示・検索・並べ替えに使います。`singleton: true` のコレクションには一覧が無く、1件だけのレコードを直接開きます。
 
+### サイトでの下書きのプレビュー
+
+コレクションの `previewUrl` に、サイトのページの `http` か `https` の絶対 URL を指定すると、そのコレクションの保存済みレコードの編集画面に **サイトで確認** ボタンが出ます。
+
+```json
+{
+	"collections": {
+		"news": { "previewUrl": "https://www.example.com/news/preview" }
+	}
+}
+```
+
+`previewUrl` の無いコレクションにはボタンを出しません。プレビューのフック `pbcms_preview.pb.js`（[PocketBase のフック](#pocketbase-のフック)を参照）か、[Go パッケージ](#go-パッケージ)が必要です。補助ライブラリはありません。ページは、次の説明に沿ってサイト側で実装します。
+
+**ページが受け取るもの。** ボタンは新しいタブを開き、`previewUrl` に HTML のフォームを送ります。`POST` で、本文は `application/x-www-form-urlencoded` です。
+
+| 項目         | 値                                                             |
+| ------------ | -------------------------------------------------------------- |
+| `collection` | コレクション名（`news` など）                                  |
+| `id`         | レコードの ID                                                  |
+| `token`      | このレコード 1 件だけに使えるプレビュー用トークン。10 分間有効 |
+
+プレビューに出るのは保存済みのレコードです。保存していない変更は反映されません。項目は今後増えることがあるので、知らない項目は無視してください。
+
+**ページが下書きを読む方法。** トークンを付けて PocketBase を呼びます。
+
+```http
+GET https://pb.example.com/api/cms/preview/news/abc123def456ghi
+Authorization: Bearer <token>
+```
+
+| ステータス | 意味                                                                                           |
+| ---------- | ---------------------------------------------------------------------------------------------- |
+| 200        | PocketBase のレコードの API と同じ形のレコード（下書きを含む）。`Cache-Control: no-store` 付き |
+| 401        | トークンが無い・正しくない・期限切れ。CMS からもう一度プレビューを開くよう案内します           |
+| 403        | 別のレコードのトークン                                                                         |
+| 404        | レコードが消されている                                                                         |
+
+リレーションは ID で返ります。関連するレコードを表示するには、公開ページと同じように PocketBase のレコードの API から読みます。トークンで読めるのは、その 1 件だけです。
+
+**ページで守ること。**
+
+- 別のオリジンからのフォームの `POST` を受け付けてください。多くのフレームワークは CSRF 対策として既定で拒否するので、CMS のオリジンを許可するか、このルートを対象から外します。`SameSite=Lax` や `Strict` の Cookie は送られません。
+- このフォームは誰でも送れるので、項目は信頼できない入力として扱います。ページを用意したコレクションだけを受け付け、ID の形式を確かめ、呼び先は必ず自分の PocketBase にします（リクエストから受け取ったアドレスは使いません）。
+- ページは HTTPS で配信し、トークンを URL やログに残さず、ページをキャッシュ・インデックスさせないでください（`Cache-Control: no-store`、`noindex`）。
+- リッチテキストは、無害化するフック（後述）を入れた状態でだけ表示してください。
+
+[`examples/lantern-coffee/preview-site/server.mjs`](examples/lantern-coffee/preview-site/server.mjs) は、これを行う依存パッケージなしの小さなページです。サンプルの設定では `posts` と `about` がこのページを指しています。[開発用の PocketBase](#開発用の-pocketbase-で試す) を起動した状態で `node examples/lantern-coffee/preview-site/server.mjs` を実行し、ボタンを押してください。自分のサイトの設定では、この `previewUrl` を書き換えるか消してください。
+
 ## PocketBase のフック
 
 JavaScript のフックは [`hooks/pb_hooks/`](hooks/pb_hooks) にあります。使うファイルを、読み込む `pbcms/` フォルダと一緒に、自分の PocketBase の `pb_hooks/` にコピーします。
@@ -189,6 +238,7 @@ CMS には `editor@example.com` / `password1234` でログインします。Pock
 
 - `examples/lantern-coffee/pb_migrations/` に JavaScript のマイグレーションがあります（`users.role` も含みます）。自分の PocketBase の `pb_migrations/` に置きます。
 - `examples/lantern-coffee/cms.config.json` が対応する設定ファイルです。`pb_public/cms/config.json` にコピーします。
+- `examples/lantern-coffee/preview-site/` は、設定の `previewUrl` が指すページです（[サイトでの下書きのプレビュー](#サイトでの下書きのプレビュー)を参照）。
 - どのコレクションにも `created` と `updated`（autodate 型）があります。マイグレーションで作ったコレクションには自動では付かないためです。
 
 ## ライセンス

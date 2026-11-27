@@ -44,7 +44,7 @@ describe('GET /api/cms/schema', () => {
 
 		it('gives an editor the collections the config names, in its order', async () => {
 			const { collections } = await fetchSchema(await asEditor(server.url))
-			expect(collections.map(c => c.name)).toEqual(['posts', 'stores', 'about', 'media'])
+			expect(collections.map(c => c.name)).toEqual(['posts', 'events', 'stores', 'about', 'media'])
 
 			const posts = collections[0]
 			expect(Object.keys(posts).toSorted((a, b) => a.localeCompare(b))).toEqual(['fields', 'id', 'name', 'type'])
@@ -61,6 +61,7 @@ describe('GET /api/cms/schema', () => {
 				'published_at',
 				'created',
 				'updated',
+				'stores',
 			])
 			expect(posts.fields.find(f => f.name === 'category')).toMatchObject({
 				maxSelect: 1,

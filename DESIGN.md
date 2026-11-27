@@ -47,6 +47,7 @@ Browse them at `/cms/#/styleguide` in `pnpm dev` (the page is not included in pr
 | Text inputs                                             | `Label` + `Input` / `Textarea`; link help text with `aria-describedby`; set `aria-invalid="true"` for errors and show the message as text       |
 | Choice from a list                                      | `Select` (Bits UI). Arrow keys and type-ahead work                                                                                              |
 | Tabular data                                            | `Table` inside a `bg-card rounded-xl border` wrapper with `overflow-x-auto`. Give it a (visually hidden) `Table.Caption`                        |
+| Versions of one input (content locales)                 | `Tabs` (Bits UI). Arrow keys move between tabs; inactive panels stay mounted but hidden                                                         |
 | Status                                                  | `Badge`. Published: `bg-success-subtle text-success`; scheduled: `bg-brand-subtle text-link`; draft: `variant="secondary"`                      |
 | Confirm / modal                                         | `Dialog`. Focus is trapped and Esc closes; put the destructive action on the right of `Dialog.Footer`                                           |
 | Notifications                                           | `toast.success/error/info` from `svelte-sonner`; `<Toaster>` is mounted once in the root layout. Don't rely on color alone: say what happened   |

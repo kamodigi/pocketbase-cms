@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { unzipSync } from 'fflate'
 import { execFile } from 'node:child_process'
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { promisify } from 'node:util'
@@ -36,19 +36,15 @@ describe('release/package.sh', () => {
 	it('zips the build as cms/, the hooks as pb_hooks/ and the license', async () => {
 		await pack('v0.1.0')
 
-		const names = await entries()
-		expect(names).toEqual(
-			expect.arrayContaining([
-				'LICENSE',
-				'cms/_app/start.js',
-				'cms/index.html',
-				'pb_hooks/pbcms/html.cjs',
-				'pb_hooks/pbcms_media_urls.pb.js',
-				'pb_hooks/pbcms_sanitize.pb.js',
-				'pb_hooks/pbcms_schema.pb.js',
-			]),
+		const hooks = path.join(root, 'hooks/pb_hooks')
+		const hookEntries = await readdir(hooks, { recursive: true, withFileTypes: true })
+		const hookFiles = hookEntries
+			.filter(entry => entry.isFile())
+			.map(entry => `pb_hooks/${path.relative(hooks, path.join(entry.parentPath, entry.name))}`)
+		expect(hookFiles).toContain('pb_hooks/pbcms/html.cjs')
+		expect(await entries()).toEqual(
+			['LICENSE', 'cms/_app/start.js', 'cms/index.html', ...hookFiles].toSorted((a, b) => a.localeCompare(b)),
 		)
-		expect(names.filter(name => !/^(LICENSE$|cms\/|pb_hooks\/)/.test(name))).toEqual([])
 	})
 
 	it('starts over when the zip already exists', async () => {

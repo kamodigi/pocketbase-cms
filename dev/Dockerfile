@@ -4,10 +4,9 @@ FROM alpine:3.24 AS downloader
 ARG PB_VERSION
 ARG TARGETARCH
 
-RUN apk add --no-cache ca-certificates unzip wget \
-	&& wget -O /tmp/pb.zip "https://github.com/pocketbase/pocketbase/releases/download/v${PB_VERSION}/pocketbase_${PB_VERSION}_linux_${TARGETARCH}.zip" \
-	&& unzip /tmp/pb.zip pocketbase -d /pb \
-	&& chmod +x /pb/pocketbase
+COPY download-pocketbase.sh /usr/local/bin/download-pocketbase.sh
+RUN apk add --no-cache ca-certificates curl unzip \
+	&& download-pocketbase.sh "${PB_VERSION}" "${TARGETARCH}" /pb
 
 FROM alpine:3.24
 

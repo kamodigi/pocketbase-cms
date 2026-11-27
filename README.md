@@ -18,6 +18,21 @@ It reads your collection schema at runtime and builds the list and edit screens 
 - Field inputs come from your collection schema. A `cms.config.json` file next to the app only sets labels, ordering, list columns and similar presentation details.
 - A small PocketBase hook (JavaScript `pb_hooks` or a Go package) exposes the schema to editors, sanitizes rich text on save, and can notify your site when content changes.
 
+## Installation
+
+Every [release](https://github.com/kamodigi/pocketbase-cms/releases) comes in two forms. Replace `0.1.0` below with the version you want.
+
+**Docker image.** `ghcr.io/kamodigi/pocketbase-cms` holds the built CMS in `/dist`. You never run it; your PocketBase image copies the files out of it:
+
+```dockerfile
+COPY --from=ghcr.io/kamodigi/pocketbase-cms:0.1.0 /dist /pb/pb_public/cms
+COPY cms.config.json /pb/pb_public/cms/config.json
+```
+
+The image holds the CMS only. Take the [PocketBase hooks](#pocketbase-hooks) from the zip of the same version, or use the Go package.
+
+**Zip.** `pocketbase-cms_0.1.0.zip`, attached to the release, holds `cms/` (the built CMS), `pb_hooks/` (the JavaScript hooks) and the license. Copy `cms/` to `pb_public/cms/`, the contents of `pb_hooks/` into your `pb_hooks/`, and your config to `pb_public/cms/config.json`. When you upgrade, replace `pb_public/cms/` as a whole, so no files of the old version are left behind.
+
 ## Configuration
 
 The CMS reads `config.json` from its own folder, so copy your site's `cms.config.json` to `pb_public/cms/config.json`.
@@ -41,7 +56,7 @@ When the config names a collection or field that your PocketBase schema does not
 
 ## PocketBase hooks
 
-The JavaScript hooks live in [`hooks/pb_hooks/`](hooks/pb_hooks). Copy the files you need, together with the `pbcms/` folder they load, into your PocketBase's `pb_hooks/`.
+The JavaScript hooks are in the release zip's `pb_hooks/` (in this repository, [`hooks/pb_hooks/`](hooks/pb_hooks)). Copy the files you need, together with the `pbcms/` folder they load, into your PocketBase's `pb_hooks/`.
 
 | File                     | What it does                                                                                                                             |
 | ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------- |
@@ -138,6 +153,38 @@ Sign in at the CMS with `editor@example.com` / `password1234`. The PocketBase da
 - `examples/lantern-coffee/pb_migrations/` holds the JavaScript migrations, including `users.role`. Put them in your PocketBase's `pb_migrations/`.
 - `examples/lantern-coffee/cms.config.json` is the matching config. Copy it to `pb_public/cms/config.json`.
 - Every collection has `created` and `updated` (autodate) fields. Collections made by migrations don't get them automatically.
+
+## Releases
+
+The CMS, the JavaScript hooks and the Go package share one version, following [Semantic Versioning](https://semver.org). While the major version is 0, a minor release may break compatibility and a patch release does not; read the release notes before upgrading.
+
+| What             | Name for version 0.1.0                                    |
+| ---------------- | --------------------------------------------------------- |
+| Git tag          | `v0.1.0` (`go get …/pbcms@v0.1.0` uses it too)            |
+| Docker image     | `ghcr.io/kamodigi/pocketbase-cms:0.1.0` (no `latest` tag) |
+| Zip on a release | `pocketbase-cms_0.1.0.zip`                                |
+
+The tag is the only place the version is written (`version` in `package.json` stays `0.0.0`). To publish a release, tag a commit on `main` and push the tag:
+
+```sh
+git fetch origin
+git tag -a v0.1.0 -m v0.1.0 origin/main
+git push origin v0.1.0
+```
+
+The [release workflow](.github/workflows/release.yml) runs all of CI, then pushes the image (`linux/amd64` and `linux/arm64`) and creates the GitHub release with the zip. A tag with a suffix, such as `v0.1.0-rc.1`, becomes a pre-release. Never move or reuse a published tag: Go's module proxy keeps the first content it saw. Version 2 needs a `/v2` module path in `go.mod` first, so the packaging script refuses it until then.
+
+GHCR creates a new package as private. After the first release, a maintainer has to make it public once, in the package's settings on GitHub.
+
+To try the packaging locally (needs `zip`; the second check needs Docker):
+
+```sh
+pnpm build
+release/package.sh v0.0.0-dev   # release-out/pocketbase-cms_0.0.0-dev.zip
+unzip -q release-out/pocketbase-cms_0.0.0-dev.zip -d release-out/files
+docker build -f release/Dockerfile -t pocketbase-cms:check release-out/files
+release/verify-image.sh pocketbase-cms:check build
+```
 
 ## License
 

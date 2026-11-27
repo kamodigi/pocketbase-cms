@@ -1,0 +1,72 @@
+name: Release
+
+# A tag such as v0.1.0 publishes that version: the image ghcr.io/kamodigi/pocketbase-cms:0.1.0 and a
+# GitHub release with the zip. See "Releases" in README.md.
+on:
+  push:
+    tags: ['v*']
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  # Everything a pull request has to pass. Its package job checks the tag, builds the zip and tries
+  # the image; what it uploads is what gets published.
+  ci:
+    name: CI
+    uses: ./.github/workflows/ci.yml
+
+  publish:
+    name: Publish the image and the release
+    needs: ci
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      packages: write
+    env:
+      TAG: ${{ github.ref_name }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: release
+          path: release-out
+
+      - name: Unpack the zip
+        run: unzip -q "release-out/pocketbase-cms_${TAG#v}.zip" -d release-out/files
+
+      - name: Log in to GHCR
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: echo "$GHCR_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+
+      # The files are the same on every platform; listing both lets any site's build use the image.
+      - name: Build and push the image
+        run: |
+          docker buildx create --use
+          docker buildx build \
+            --platform linux/amd64,linux/arm64 \
+            --file release/Dockerfile \
+            --build-arg "VERSION=${TAG#v}" \
+            --build-arg "REVISION=${GITHUB_SHA}" \
+            --tag "ghcr.io/${GITHUB_REPOSITORY}:${TAG#v}" \
+            --push \
+            release-out/files
+
+      - name: Check COPY --from with the pushed image
+        run: release/verify-image.sh "ghcr.io/${GITHUB_REPOSITORY}:${TAG#v}" release-out/files/cms
+
+      - name: Create the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          prerelease=()
+          if [[ "$TAG" == *-* ]]; then prerelease=(--prerelease); fi
+          gh release create "$TAG" "release-out/pocketbase-cms_${TAG#v}.zip" \
+            --verify-tag --title "$TAG" --generate-notes "${prerelease[@]}"

@@ -46,7 +46,9 @@
 	const searchDelay = 300
 	const id = $props.id()
 
-	const chosen = $derived(Array.isArray(value) ? value : typeof value === 'string' && value !== '' ? [value] : [])
+	const chosen = $derived(
+		Array.isArray(value) ? value.map(String) : typeof value === 'string' && value !== '' ? [value] : [],
+	)
 
 	// The chosen records seen so far, to name them.
 	const known = new SvelteMap<string, RecordModel>()

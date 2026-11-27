@@ -4,7 +4,7 @@ import type { RecordModel } from 'pocketbase'
 
 import type { FormModel } from './model'
 
-import { editableFields, type FormValue, type FormValues, isSameValue, toInputValue } from './values'
+import { editableFields, type FormValue, type FormValues, isFileKind, isSameValue, toInputValue } from './values'
 
 export interface Draft {
 	/**
@@ -31,6 +31,8 @@ The values of the editable fields that differ from the ones the form started wit
 export function changedValues(model: FormModel, values: FormValues, initial: FormValues): FormValues {
 	const changed: FormValues = {}
 	for (const field of editableFields(model)) {
+		// Files cannot be kept in the browser's storage: a chosen file is lost with the tab.
+		if (isFileKind(field)) continue
 		const blank = toInputValue(field, undefined)
 		const value = values[field.name] ?? blank
 		if (!isSameValue(value, initial[field.name] ?? blank)) changed[field.name] = value

@@ -1,10 +1,14 @@
 <script lang="ts">
+	import type { RecordModel } from 'pocketbase'
+
 	import { Button } from '#lib/components/ui/button/index.js'
 	import { Input } from '#lib/components/ui/input/index.js'
 	import { Label } from '#lib/components/ui/label/index.js'
 	import * as Select from '#lib/components/ui/select/index.js'
 	import { Textarea } from '#lib/components/ui/textarea/index.js'
 	import { parseDate } from '#lib/list/request.js'
+	import FileInput from '#lib/media/file-input.svelte'
+	import MediaInput from '#lib/media/media-input.svelte'
 	import RelationInput from '#lib/relation/relation-input.svelte'
 	import { m } from '#paraglide/messages.js'
 
@@ -23,6 +27,10 @@
 		*/
 		onslug?: () => void
 		/**
+		The saved record, for its stored files; undefined on the screen that creates one.
+		*/
+		record?: RecordModel
+		/**
 		The label of the field a slug is made from.
 		*/
 		slugSourceLabel?: string
@@ -30,7 +38,7 @@
 		value: FormValue
 	}
 
-	let { error, field, onchange, onslug, slugSourceLabel = '', uiLocale, value = $bindable() }: Props = $props()
+	let { error, field, onchange, onslug, record, slugSourceLabel = '', uiLocale, value = $bindable() }: Props = $props()
 
 	const id = $props.id()
 	const noneValue = '$none'
@@ -119,7 +127,17 @@
 	{:else if field.kind === 'relation' || field.kind === 'relations'}
 		<fieldset class="grid min-w-0 gap-1.5" aria-describedby={describedBy}>
 			<legend class="mb-1.5 text-sm leading-none font-medium">{@render labelText()}</legend>
-			<RelationInput {describedBy} {field} {invalid} onchange={setValue} {value} />
+			{#if field.relation?.media}
+				<MediaInput {describedBy} {field} {invalid} onchange={setValue} {uiLocale} {value} />
+			{:else}
+				<RelationInput {describedBy} {field} {invalid} onchange={setValue} {value} />
+			{/if}
+		</fieldset>
+		{@render messages()}
+	{:else if field.kind === 'file' || field.kind === 'files'}
+		<fieldset class="grid min-w-0 gap-1.5" aria-describedby={describedBy}>
+			<legend class="mb-1.5 text-sm leading-none font-medium">{@render labelText()}</legend>
+			<FileInput {describedBy} {field} {invalid} onchange={setValue} {record} {uiLocale} {value} />
 		</fieldset>
 		{@render messages()}
 	{:else if field.kind === 'autodate'}

@@ -1,14 +1,20 @@
 import type { RecordModel } from 'pocketbase'
 
 import { parseDate } from '#lib/list/request.js'
+import { mediaMetadata } from '#lib/media/library.js'
 
 import type { FormField, FormModel } from './model'
 
 /**
-What an input holds: text (also dates, as the input writes them), a number or nothing, an on/off
-switch, or a list of choices or record ids.
+The files of a file field: the names of the stored ones it keeps, and the new ones to upload.
 */
-export type FormValue = boolean | number | string | string[] | undefined
+export type FileValue = (File | string)[]
+
+/**
+What an input holds: text (also dates, as the input writes them), a number or nothing, an on/off
+switch, a list of choices or record ids, or files.
+*/
+export type FormValue = boolean | FileValue | number | string | string[] | undefined
 
 export type FormValues = Record<string, FormValue>
 
@@ -31,6 +37,10 @@ export function initialValues(model: FormModel, record: RecordModel | undefined)
 	return values
 }
 
+export function isFileKind(field: FormField): boolean {
+	return field.kind === 'file' || field.kind === 'files'
+}
+
 export function isSameValue(a: FormValue, b: FormValue): boolean {
 	return Array.isArray(a) && Array.isArray(b) ? a.length === b.length && a.every((item, i) => item === b[i]) : a === b
 }
@@ -47,9 +57,14 @@ export function recordPayload(
 	const payload: Record<string, unknown> = {}
 	for (const field of editableFields(model)) {
 		const value = values[field.name] ?? toInputValue(field, undefined)
-		if (initial && isSameValue(value, initial[field.name] ?? toInputValue(field, undefined))) continue
-		payload[field.name] = toPocketBaseValue(field, value)
+		const before = initial && (initial[field.name] ?? toInputValue(field, undefined))
+		if (initial && isSameValue(value, before)) continue
+		if (isFileKind(field)) Object.assign(payload, filePayload(field, value, before))
+		else payload[field.name] = toPocketBaseValue(field, value)
 	}
+	// An image uploaded to the media library saves its size and type (decision 12).
+	const upload = model.media && fileList(values[model.media.file]).find(item => item instanceof File)
+	if (upload && model.media) Object.assign(payload, mediaMetadata(model.media, upload))
 	if (!initial) {
 		for (const { kind, name } of model.autofill) {
 			if (kind === 'now') payload[name] = pocketBaseDate(now)
@@ -73,6 +88,16 @@ export function slugify(text: string): string {
 }
 
 /**
+A plain copy of the form's values. Unlike `$state.snapshot`, it keeps the chosen files themselves,
+which `structuredClone` would copy (losing what is known about them) or drop.
+*/
+export function snapshotValues(values: FormValues): FormValues {
+	return Object.fromEntries(
+		Object.entries(values).map(([name, value]) => [name, Array.isArray(value) ? [...value] : value]),
+	)
+}
+
+/**
 A PocketBase value as its input holds it.
 */
 export function toInputValue(field: FormField, value: unknown): FormValue {
@@ -92,6 +117,11 @@ export function toInputValue(field: FormField, value: unknown): FormValue {
 		case 'datetime': {
 			const date = typeof value === 'string' && value !== '' ? parseDate(value) : undefined
 			return date && !Number.isNaN(date.getTime()) ? localDateTime(date) : ''
+		}
+		case 'file':
+		case 'files': {
+			// One file is stored as a name, several as a list.
+			return Array.isArray(value) ? value.map(String) : typeof value === 'string' && value !== '' ? [value] : []
 		}
 		case 'number': {
 			// PocketBase stores a blank number as 0; it is shown as 0, not as an empty input.
@@ -129,6 +159,30 @@ export function toPocketBaseValue(field: FormField, value: FormValue): unknown {
 			return value
 		}
 	}
+}
+
+function fileList(value: FormValue): FileValue {
+	return Array.isArray(value) ? value : []
+}
+
+/**
+How PocketBase takes a change of files. A single file is replaced by sending the new one, or removed
+by sending "". Several are changed with the `-` (remove these names) and `+` (append these files)
+modifiers, so the ones kept are never sent again.
+*/
+function filePayload(field: FormField, value: FormValue, before: FormValue | undefined): Record<string, unknown> {
+	const files = fileList(value)
+	const added = files.filter(item => item instanceof File)
+	if (field.kind === 'file') return { [field.name]: added.at(-1) ?? files[0] ?? '' }
+	// A new record has no stored files.
+	if (before === undefined) return { [field.name]: added }
+
+	const kept = new Set(files.filter(item => typeof item === 'string'))
+	const removed = fileList(before).filter(item => typeof item === 'string' && !kept.has(item))
+	const payload: Record<string, unknown> = {}
+	if (removed.length > 0) payload[`${field.name}-`] = removed
+	if (added.length > 0) payload[`${field.name}+`] = added
+	return payload
 }
 
 function localDateTime(date: Date): string {

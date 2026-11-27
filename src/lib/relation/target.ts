@@ -6,6 +6,7 @@ import {
 	type SchemaField,
 } from '#lib/config/index.js'
 import { buildListModel } from '#lib/list/model.js'
+import { type MediaLibrary, mediaLibrary } from '#lib/media/library.js'
 
 import { nameKeys } from './name'
 
@@ -22,6 +23,10 @@ export interface RelationTarget {
 	The order of the records to choose from, as a PocketBase sort expression; empty for the id order.
 	*/
 	defaultSort: string
+	/**
+	Set for a field with `widget: "media"` that relates to the media library: it gets the image picker.
+	*/
+	media?: MediaLibrary
 	/**
 	The fields that name a record, best first.
 	*/
@@ -60,10 +65,12 @@ export function relationTarget(
 	}
 	const shown = keys.flatMap(key => resolve(key)).slice(0, 1)
 	const searchFields = [...new Set([...shown, ...list.searchFields])]
+	const library = fieldConfig?.widget === 'media' ? mediaLibrary(config, collections) : undefined
 	return {
 		baseLocale,
 		collection: target.name,
 		defaultSort: list.defaultSort,
+		media: library?.collection === target.name ? library : undefined,
 		nameKeys: keys,
 		searchFields: searchFields.length > 0 ? searchFields : ['id'],
 	}

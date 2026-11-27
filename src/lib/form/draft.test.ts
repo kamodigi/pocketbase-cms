@@ -12,6 +12,7 @@ const model = buildFormModel(
 			{ name: 'rank', type: 'number' },
 			{ name: 'pinned', type: 'bool' },
 			{ maxSelect: 2, name: 'tags', type: 'select', values: ['a', 'b'] },
+			{ name: 'image', type: 'file' },
 			{ name: 'updated', type: 'autodate' },
 		],
 		name: 'posts',
@@ -76,6 +77,11 @@ describe('changedValues', () => {
 			tags: ['a'],
 			title: 'Winter',
 		})
+	})
+
+	it('leaves out files, which the browser cannot keep', () => {
+		const image = [new File(['x'], 'cup.png', { type: 'image/png' })]
+		expect(changedValues(model, { ...initial, image, title: 'Winter' }, initial)).toEqual({ title: 'Winter' })
 	})
 })
 

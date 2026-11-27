@@ -85,7 +85,7 @@ test('an article list is searched, filtered by state, sorted by date and paged',
 
 	// Opening a record and coming back keeps the list as it was.
 	await rows.first().getByRole('link').click()
-	await expect(page.getByText('The edit screen is not built yet.')).toBeVisible()
+	await expect(page.getByRole('button', { name: 'Save' })).toBeVisible()
 	await page.goBack()
 	await expect(pagination).toContainText('Page 2 of 2')
 

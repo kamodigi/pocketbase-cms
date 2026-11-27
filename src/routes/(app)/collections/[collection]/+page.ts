@@ -1,11 +1,10 @@
 import { resolve } from '$app/paths'
 import { error, redirect } from '@sveltejs/kit'
-import { ClientResponseError } from 'pocketbase'
 
-import { signOut } from '#lib/auth/auth.js'
 import { loadRecordList, type RecordList } from '#lib/list/load.js'
 import { serializeListQuery } from '#lib/list/query.js'
 import { pb } from '#lib/pocketbase.js'
+import { requestFailed } from '#lib/request-failed.js'
 import { getLocale } from '#paraglide/runtime.js'
 
 import type { PageLoad } from './$types'
@@ -47,15 +46,4 @@ export const load: PageLoad = async ({ params, parent, url }): Promise<{ list?: 
 		redirect(307, `${resolve('/(app)/collections/[collection]', { collection: name })}${query}`)
 	}
 	return { list }
-}
-
-function requestFailed(failure: unknown): never {
-	if (!(failure instanceof ClientResponseError)) throw failure
-	// The token was refused: the session expired or the account was deleted.
-	if (failure.status === 401) {
-		signOut(pb)
-		redirect(307, resolve('/(auth)/login'))
-	}
-	// Status 0 is a network failure.
-	error(failure.status >= 400 ? failure.status : 503, failure.message)
 }

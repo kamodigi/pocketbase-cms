@@ -50,6 +50,13 @@ const record = {
 	updated: '2026-01-02 03:04:00.000Z',
 } as unknown as RecordModel
 
+/**
+The keys of the kept drafts; the auth store uses localStorage too.
+*/
+function drafts(): string[] {
+	return Object.keys(localStorage).filter(key => key.startsWith('pbcms:draft:'))
+}
+
 function sent(fetch: ReturnType<typeof serve>) {
 	const [url, init] = fetch.mock.lastCall!
 	return { body: init?.body ? JSON.parse(String(init.body)) : undefined, method: init?.method, url: String(url) }
@@ -76,6 +83,7 @@ function show(props: { collection?: string; record?: RecordModel } = {}) {
 
 beforeEach(() => pb.authStore.save('token', { collectionId: 'c', collectionName: 'users', id: 'u1', role: 'editor' }))
 afterEach(() => {
+	localStorage.clear()
 	vi.unstubAllGlobals()
 	vi.clearAllMocks()
 })
@@ -241,5 +249,149 @@ describe('RecordForm', () => {
 		expect(screen.getByRole('heading', { level: 1, name: 'Posts' })).toBeInTheDocument()
 		expect(screen.queryByRole('button', { name: 'Delete' })).not.toBeInTheDocument()
 		expect(screen.queryByRole('link', { name: 'Back to the list' })).not.toBeInTheDocument()
+	})
+
+	it('keeps unsaved input and restores it when the record is opened again', async () => {
+		const user = userEvent.setup()
+		const fetch = serve(200, { ...record, rank: 0, title: 'Autumn blend' })
+		const first = show({ record })
+		await user.type(screen.getByRole('textbox', { name: /^Title/ }), ' blend')
+		await user.clear(screen.getByRole('spinbutton', { name: 'rank' }))
+		first.unmount()
+
+		show({ record })
+		const prompt = screen.getByRole('region', { name: 'You have unsaved changes. Restore them?' })
+		expect(prompt).toHaveFocus()
+		const form = screen.getByRole('form')
+		expect(form).toHaveProperty('inert', true)
+		expect(screen.getByRole('textbox', { name: /^Title/ })).toHaveValue('Autumn')
+
+		await user.click(screen.getByRole('button', { name: 'Restore' }))
+		expect(prompt).not.toBeInTheDocument()
+		expect(form).toHaveProperty('inert', false)
+		expect(screen.getByRole('textbox', { name: /^Title/ })).toHaveValue('Autumn blend')
+		expect(screen.getByRole('spinbutton', { name: 'rank' })).toHaveProperty('value', '')
+
+		await user.click(screen.getByRole('button', { name: 'Save' }))
+		await waitFor(() => expect(toasts.success).toHaveBeenCalled())
+		expect(sent(fetch).body).toEqual({ rank: 0, title: 'Autumn blend' })
+		expect(drafts()).toEqual([])
+	})
+
+	it('warns when the record was saved after the input was kept, until it is saved', async () => {
+		const user = userEvent.setup()
+		const newer = { ...record, rank: 5, updated: '2026-02-01 00:00:00.000Z' }
+		const warning = /This record was saved again after that/
+		const first = show({ record })
+		await user.type(screen.getByRole('textbox', { name: /^Title/ }), ' blend')
+		expect(screen.queryByText(warning)).not.toBeInTheDocument()
+		first.unmount()
+
+		const unchanged = show({ record })
+		expect(screen.queryByText(warning)).not.toBeInTheDocument()
+		unchanged.unmount()
+
+		const second = show({ record: newer })
+		expect(screen.getByRole('region', { name: /^You have unsaved changes/ })).toHaveAccessibleDescription(warning)
+		await user.click(screen.getByRole('button', { name: 'Restore' }))
+		expect(screen.getByRole('textbox', { name: /^Title/ })).toHaveValue('Autumn blend')
+		// Restored and left again without saving: still input made before that save.
+		await user.type(screen.getByRole('textbox', { name: /^Title/ }), 's')
+		second.unmount()
+
+		serve(200, { ...newer, title: 'Autumn blends', updated: '2026-02-02 00:00:00.000Z' })
+		show({ record: newer })
+		expect(screen.getByText(warning)).toBeInTheDocument()
+		await user.click(screen.getByRole('button', { name: 'Restore' }))
+		await user.click(screen.getByRole('button', { name: 'Save' }))
+		await waitFor(() => expect(drafts()).toEqual([]))
+		await user.type(screen.getByRole('textbox', { name: /^Title/ }), '!')
+		await waitFor(() => expect(localStorage.getItem(drafts()[0]!)).toContain('2026-02-02'))
+	})
+
+	it('writes no draft once its editor is signed out', async () => {
+		const user = userEvent.setup()
+		show({ record })
+		pb.authStore.clear()
+		await user.type(screen.getByRole('textbox', { name: /^Title/ }), ' blend')
+		expect(drafts()).toEqual([])
+	})
+
+	it('discards kept input', async () => {
+		const user = userEvent.setup()
+		const first = show({ record })
+		await user.type(screen.getByRole('textbox', { name: /^Title/ }), ' blend')
+		first.unmount()
+
+		const second = show({ record })
+		await user.click(screen.getByRole('button', { name: 'Discard' }))
+		expect(screen.getByRole('textbox', { name: /^Title/ })).toHaveValue('Autumn')
+		expect(drafts()).toEqual([])
+		second.unmount()
+
+		show({ record })
+		expect(screen.queryByRole('button', { name: 'Restore' })).not.toBeInTheDocument()
+	})
+
+	it('keeps nothing once the changes are undone', async () => {
+		const user = userEvent.setup()
+		show({ record })
+		const title = screen.getByRole('textbox', { name: /^Title/ })
+
+		await user.type(title, 's')
+		await waitFor(() => expect(drafts()).toEqual(['pbcms:draft:u1:posts/p1']))
+		await user.type(title, '{Backspace}')
+		await waitFor(() => expect(drafts()).toEqual([]))
+	})
+
+	it('restores a new record, its slug still following the title', async () => {
+		const user = userEvent.setup()
+		const fetch = serve(200, { ...record, id: 'p9' })
+		const first = show()
+		await user.type(screen.getByRole('textbox', { name: /^Title/ }), 'Winter')
+		first.unmount()
+
+		show()
+		await user.click(screen.getByRole('button', { name: 'Restore' }))
+		await user.type(screen.getByRole('textbox', { name: /^Title/ }), ' Blend')
+		expect(screen.getByRole('textbox', { name: /^Slug/ })).toHaveValue('winter-blend')
+
+		await user.click(screen.getByRole('button', { name: 'Create' }))
+		await waitFor(() => expect(navigation.goto).toHaveBeenCalled())
+		expect(sent(fetch).method).toBe('POST')
+		expect(drafts()).toEqual([])
+	})
+
+	it('keeps the input when a save fails, for that editor only', async () => {
+		const user = userEvent.setup()
+		serve(401, { message: 'The request requires valid record authorization token.', status: 401 })
+		const first = show({ record })
+		await user.type(screen.getByRole('textbox', { name: /^Title/ }), ' blend')
+		await user.click(screen.getByRole('button', { name: 'Save' }))
+		await waitFor(() => expect(navigation.goto).toHaveBeenCalled())
+		first.unmount()
+
+		pb.authStore.save('token', { collectionId: 'c', collectionName: 'users', id: 'u2', role: 'editor' })
+		const other = show({ record })
+		expect(screen.queryByRole('button', { name: 'Restore' })).not.toBeInTheDocument()
+		other.unmount()
+
+		pb.authStore.save('token', { collectionId: 'c', collectionName: 'users', id: 'u1', role: 'editor' })
+		show({ record })
+		expect(screen.getByRole('button', { name: 'Restore' })).toBeInTheDocument()
+	})
+
+	it('forgets the input of a deleted record', async () => {
+		const user = userEvent.setup()
+		serve(204, undefined)
+		show({ record })
+		await user.type(screen.getByRole('textbox', { name: /^Title/ }), ' blend')
+
+		await user.click(screen.getByRole('button', { name: 'Delete' }))
+		await screen.findByRole('dialog', { name: 'Delete this record?' })
+		await user.click(screen.getAllByRole('button', { name: 'Delete' }).at(-1)!)
+
+		await waitFor(() => expect(navigation.goto).toHaveBeenCalled())
+		expect(drafts()).toEqual([])
 	})
 })

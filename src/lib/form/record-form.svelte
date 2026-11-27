@@ -15,6 +15,8 @@
 	import PreviewButton from '#lib/preview/preview-button.svelte'
 	import { m } from '#paraglide/messages.js'
 
+	import { changedValues, draftKey, isSavedSince, readDraft, recordUpdated, removeDraft, writeDraft } from './draft'
+	import DraftPrompt from './draft-prompt.svelte'
 	import FieldInput from './field-input.svelte'
 	import { buildFormModel, type FormField } from './model'
 	import { type FieldErrors, serverFieldErrors, validateField, validateForm } from './validate'
@@ -74,6 +76,39 @@
 	const slugFields = fields.filter(field => field.kind === 'slug' && field.slugFrom !== undefined)
 	let ownSlugs = $state(Object.fromEntries(slugFields.map(field => [field.name, values[field.name] !== ''])))
 
+	// Unsaved input kept in the browser (decision 40). One found on opening waits for the user's choice.
+	const userId = pb.authStore.record?.id ?? ''
+	const storageKey = untrack(() => draftKey(userId, collection, record?.id))
+	let foundDraft = $state.raw(
+		readDraft(
+			storageKey,
+			model,
+			untrack(() => initial),
+		),
+	)
+	// The `updated` of the record the unsaved input was made on; a restored draft brings its own.
+	let draftBase = untrack(() => recordUpdated(record))
+	// Set once the record is created or deleted: nothing typed after that belongs to this draft.
+	let isDraftClosed = false
+
+	// Written on every change, so closing the tab loses nothing.
+	$effect(() => {
+		// Signing out removes the editor's drafts; an open form must not write one again.
+		if (foundDraft || isDraftClosed || (pb.authStore.record?.id ?? '') !== userId) return
+		const changed = changedValues(model, $state.snapshot(values), $state.snapshot(initial))
+		if (Object.keys(changed).length === 0) {
+			removeDraft(storageKey)
+			draftBase = untrack(() => recordUpdated(saved))
+			return
+		}
+		writeDraft(storageKey, {
+			ownSlugs: $state.snapshot(ownSlugs),
+			recordUpdated: draftBase,
+			savedAt: new Date().toISOString(),
+			values: changed,
+		})
+	})
+
 	const title = $derived(recordTitle(saved))
 	const heading = $derived(isSingleton ? label : saved ? title || m.list_untitled() : m.record_new_heading())
 
@@ -95,6 +130,11 @@
 		else errors[field.name] = message
 	}
 
+	function closeDraft() {
+		isDraftClosed = true
+		removeDraft(storageKey)
+	}
+
 	async function confirmDelete() {
 		if (!saved) return
 		isDeleting = true
@@ -106,9 +146,16 @@
 			failed(error, m.record_error_delete)
 			return
 		}
+		closeDraft()
 		isDeleteOpen = false
 		toast.success(m.record_deleted({ title: title || m.list_untitled() }))
 		await goto(resolve('/(app)/collections/[collection]', { collection }))
+	}
+
+	async function discardDraft() {
+		removeDraft(storageKey)
+		foundDraft = undefined
+		await focusForm()
 	}
 
 	function failed(error: unknown, message: (inputs: { message: string }) => string) {
@@ -130,9 +177,24 @@
 		document.querySelector<HTMLElement>('[data-record-form] [aria-invalid="true"]')?.focus()
 	}
 
+	// The prompt is gone with the choice; the keyboard goes on to the form.
+	async function focusForm() {
+		await tick()
+		document.querySelector<HTMLElement>('[data-record-form] :is(input, textarea, button):not(:disabled)')?.focus()
+	}
+
 	function recordTitle(source: RecordModel | undefined): string {
 		const value: unknown = model.titleField === undefined ? undefined : source?.[model.titleField]
 		return typeof value === 'string' || typeof value === 'number' ? String(value) : ''
+	}
+
+	async function restoreDraft() {
+		if (!foundDraft) return
+		Object.assign(values, foundDraft.values)
+		Object.assign(ownSlugs, foundDraft.ownSlugs)
+		draftBase = foundDraft.recordUpdated
+		foundDraft = undefined
+		await focusForm()
 	}
 
 	function slugSource(field: FormField): FormField | undefined {
@@ -186,11 +248,13 @@
 
 		const name = recordTitle(result) || m.list_untitled()
 		if (saved) {
+			removeDraft(storageKey)
 			saved = result
 			initial = initialValues(model, result)
 			values = initialValues(model, result)
 			toast.success(m.record_saved({ title: name }))
 		} else {
+			closeDraft()
 			toast.success(m.record_created({ title: name }))
 			// The new record's own screen, in place of the one that created it.
 			await goto(resolve('/(app)/collections/[collection]/[id]', { collection, id: result.id }), {
@@ -233,7 +297,25 @@
 	<h1 class="text-2xl font-bold break-words">{heading}</h1>
 </div>
 
-<form class="grid gap-6" aria-label={heading} data-record-form novalidate onsubmit={submit}>
+{#if foundDraft}
+	<DraftPrompt
+		isSavedSince={isSavedSince(foundDraft, saved)}
+		ondiscard={discardDraft}
+		onrestore={restoreDraft}
+		savedAt={foundDraft.savedAt}
+		{uiLocale}
+	/>
+{/if}
+
+<!-- Inert until the user chooses, so that new input never mixes with the kept one. -->
+<form
+	class={['grid gap-6', foundDraft && 'opacity-50']}
+	aria-label={heading}
+	data-record-form
+	inert={Boolean(foundDraft)}
+	novalidate
+	onsubmit={submit}
+>
 	{#if otherErrors.length > 0}
 		<ul class="border-destructive text-destructive grid gap-1 rounded-lg border p-3 text-sm" role="alert">
 			{#each otherErrors as message (message)}

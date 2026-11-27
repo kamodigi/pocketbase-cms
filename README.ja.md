@@ -67,6 +67,10 @@ PocketBase のスキーマに無いコレクションや項目を設定に書い
 - **検索**は、その名前の項目と、関連先のコレクションの `list.search` を対象にします。並び順は関連先の `list.sort` です。
 - **設定ファイルに無いコレクション**（`users` など）も選べます。選べるレコードは PocketBase の一覧・閲覧のルールで決まり、名前は `displayField`・`name`・`title`・`email` から読みます。
 
+### 未保存の入力
+
+編集画面で入力すると、CMS は変更した項目をブラウザの localStorage に一時保存します。下書きは編集者とレコードごとに1つです（新規作成の画面はコレクションごとに1つ）。同じ画面を開き直すと「保存していない変更があります。復元しますか？」と尋ね、復元か破棄を選ぶとフォームを使えるようになります。復元すると変更した項目だけが戻り、保存するまで何も送りません。下書きは、レコードを保存または削除したとき、破棄を選んだとき、自分で変更を元に戻したときに消えます。ログアウトのボタンでログアウトすると、その編集者の下書きをすべて消すので、共用のパソコンに未公開の文章は残りません。ログインの期限が切れた場合は残るので、入力は失われません。レコードに `updated` の項目があり、下書きを作った後に別の保存があった場合は、その旨を表示します（復元は選べます）。ブラウザの保存領域がいっぱいか使えない場合は、一時保存なしで動きます。
+
 ### サイトでの下書きのプレビュー
 
 コレクションの `previewUrl` に、サイトのページの `http` か `https` の絶対 URL を指定すると、そのコレクションの保存済みレコードの編集画面に **サイトで確認** ボタンが出ます。
@@ -177,7 +181,11 @@ app := pocketbase.New()
 pbcms.Register(app)
 ```
 
-`pbcms.Register` は `GET /api/cms/schema` とプレビューのルート（`POST /api/cms/preview/{collection}/{id}/token` と `GET /api/cms/preview/{collection}/{id}`）を追加し、`pbcms_notify.pb.js` と同じようにサイトへ通知します。応答・権限の判定・環境変数（`PBCMS_CONFIG_PATH`・`PBCMS_PREVIEW_TOKEN_DURATION`）の扱いは `pbcms_schema.pb.js`・`pbcms_preview.pb.js` と、送る内容と `PBCMS_NOTIFY_URL`・`PBCMS_NOTIFY_SECRET` の扱いは `pbcms_notify.pb.js` と同じなので、これらのフックは一緒に入れないでください。プレビュー用トークンも同じものなので、JavaScript のフックが発行したトークンは Go パッケージでも使え、その逆も使えます。ほかのフックはまだパッケージにありません。それまでは、[`tests/gopocketbase/main.go`](tests/gopocketbase/main.go) と同じように PocketBase の `jsvm` プラグインを登録し、`pbcms_sanitize.pb.js`・`pbcms_media_urls.pb.js` を、それらが読み込む `pbcms/` フォルダと一緒に `pb_hooks/` に置いてください。
+`pbcms.Register` は上の JavaScript のフックすべての代わりになるので、フックは一緒に入れないでください。読み取る環境変数（`PBCMS_CONFIG_PATH`・`PBCMS_PUBLIC_URL`・`PBCMS_PREVIEW_TOKEN_DURATION`・`PBCMS_NOTIFY_URL`・`PBCMS_NOTIFY_SECRET`）も同じです。
+
+- `GET /api/cms/schema` とプレビューのルート（`POST /api/cms/preview/{collection}/{id}/token` と `GET /api/cms/preview/{collection}/{id}`）を追加します。応答と権限の判定は同じです。プレビュー用トークンも同じものなので、JavaScript のフックが発行したトークンは Go パッケージでも使え、その逆も使えます。
+- サイトへは `pbcms_notify.pb.js` と同じ内容を通知します。
+- 保存時に同じ許可リストで `editor` 型の項目を無害化し、応答でもう一度無害化して画像の URL を引き直します。Go のサニタイザーは `hooks/pb_hooks/pbcms/html.cjs` を移植したもので、テストで両方に同じ入力を与えて出力が同じことを確かめています。
 
 ## 開発
 

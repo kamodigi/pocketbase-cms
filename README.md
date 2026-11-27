@@ -67,6 +67,10 @@ On the edit screen, a `relation` field shows the chosen records by name. "Choose
 - **Search** matches that name field and the related collection's `list.search`. Records are in its `list.sort` order.
 - **Collections outside the config** (such as `users`) work too. PocketBase's list and view rules decide which of their records an editor can choose, and their names are read from `displayField`, `name`, `title` or `email`.
 
+### Unsaved input
+
+While you type on an edit screen, the CMS keeps the changed fields in the browser's local storage, one draft per editor and record (the new-record screen has one per collection). Opening that screen again asks "You have unsaved changes. Restore them?"; the form can be used once you choose to restore or discard. A restore puts back only the changed fields and sends nothing until you save. The draft is removed when you save or delete the record, discard it, or undo the changes yourself. Signing out with the sign-out button removes all of that editor's drafts, so a shared computer keeps no unpublished text. A session that expires keeps them, so no input is lost. If the record has an `updated` field and was saved again after the draft was made, the question says so; you can still restore. If the browser's storage is full or blocked, the screens work without drafts.
+
 ### Draft previews on your site
 
 Give a collection a `previewUrl`, the absolute `http` or `https` address of a page on your site, and the edit screen of its saved records gets a **Preview on site** button:
@@ -177,7 +181,11 @@ app := pocketbase.New()
 pbcms.Register(app)
 ```
 
-`pbcms.Register` adds `GET /api/cms/schema` and the preview routes (`POST /api/cms/preview/{collection}/{id}/token` and `GET /api/cms/preview/{collection}/{id}`), with the same answers, the same checks and the same environment variables (`PBCMS_CONFIG_PATH`, `PBCMS_PREVIEW_TOKEN_DURATION`) as `pbcms_schema.pb.js` and `pbcms_preview.pb.js`, and notifies your site like `pbcms_notify.pb.js`, with the same request and the same `PBCMS_NOTIFY_URL` and `PBCMS_NOTIFY_SECRET`; don't install those hooks as well. Preview tokens are the same in both, so one issued by the JavaScript hook works with the Go package and the other way round. The other hooks are not in the package yet: until they are, register PocketBase's `jsvm` plugin and keep `pbcms_sanitize.pb.js` and `pbcms_media_urls.pb.js` in `pb_hooks/`, with the `pbcms/` folder they load, as [`tests/gopocketbase/main.go`](tests/gopocketbase/main.go) does.
+`pbcms.Register` replaces all the JavaScript hooks above, so don't install them as well. It reads the same environment variables (`PBCMS_CONFIG_PATH`, `PBCMS_PUBLIC_URL`, `PBCMS_PREVIEW_TOKEN_DURATION`, `PBCMS_NOTIFY_URL`, `PBCMS_NOTIFY_SECRET`):
+
+- It adds `GET /api/cms/schema` and the preview routes (`POST /api/cms/preview/{collection}/{id}/token` and `GET /api/cms/preview/{collection}/{id}`), with the same answers and the same checks. Preview tokens are the same in both, so one issued by the JavaScript hook works with the Go package and the other way round.
+- It notifies your site with the same request as `pbcms_notify.pb.js`.
+- It sanitizes `editor` fields on save with the same allowlist, and sanitizes them again in responses with image URLs looked up afresh. The Go sanitizer is a port of `hooks/pb_hooks/pbcms/html.cjs`; its tests run both on the same inputs and check that the output is the same.
 
 ## Development
 

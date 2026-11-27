@@ -41,7 +41,7 @@ export function validateField(form: FormField, value: FormValue, uiLocale: strin
 	switch (form.kind) {
 		case 'checkboxes':
 		case 'select': {
-			const chosen = Array.isArray(value) ? value : [String(value)]
+			const chosen = Array.isArray(value) ? value.map(String) : [String(value)]
 			if (chosen.some(item => !(field.values ?? []).includes(item))) return m.form_error_option()
 			const max = field.maxSelect ?? 1
 			return form.kind === 'checkboxes' && chosen.length > max ? m.form_error_max_select({ max }) : undefined
@@ -49,6 +49,10 @@ export function validateField(form: FormField, value: FormValue, uiLocale: strin
 		case 'date':
 		case 'datetime': {
 			return dateError(form, value, uiLocale)
+		}
+		case 'files': {
+			const max = field.maxSelect ?? 1
+			return Array.isArray(value) && value.length > max ? m.form_error_max_files({ max }) : undefined
 		}
 		case 'number': {
 			return numberError(form, value)

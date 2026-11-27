@@ -20,7 +20,7 @@
 	import FieldInput from './field-input.svelte'
 	import { buildFormModel, type FormField } from './model'
 	import { type FieldErrors, serverFieldErrors, validateField, validateForm } from './validate'
-	import { initialValues, recordPayload, slugify } from './values'
+	import { initialValues, recordPayload, slugify, snapshotValues } from './values'
 
 	interface Props {
 		/**
@@ -212,7 +212,7 @@
 			return
 		}
 
-		const payload = recordPayload(model, $state.snapshot(values), {
+		const payload = recordPayload(model, snapshotValues(values), {
 			initial: saved ? $state.snapshot(initial) : undefined,
 			now: new Date(),
 			userId: pb.authStore.record?.id,
@@ -277,6 +277,7 @@
 							changed(field)
 						}
 					: undefined}
+				record={saved}
 				slugSourceLabel={slugSource(field)?.label}
 				{uiLocale}
 				bind:value={values[field.name]}

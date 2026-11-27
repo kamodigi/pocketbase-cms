@@ -35,6 +35,31 @@ describe('relationTarget', () => {
 		})
 	})
 
+	it('gives a media field the media library, and only that field', () => {
+		const media: SchemaCollection = {
+			fields: [
+				{ name: 'file', type: 'file' },
+				{ name: 'alt', type: 'text' },
+			],
+			id: 'col_media',
+			name: 'media',
+		}
+		const config: CmsConfig = {
+			collections: { media: { titleField: 'alt' } },
+			media: { altField: 'alt', collection: 'media', fileField: 'file' },
+			version: 1,
+		}
+		const cover: SchemaField = { collectionId: 'col_media', name: 'cover', type: 'relation' }
+
+		expect(relationTarget(config, cover, { widget: 'media' }, [media], 'en').media).toMatchObject({
+			altField: 'alt',
+			collection: 'media',
+			fields: { file: 'file' },
+		})
+		expect(relationTarget(config, cover, undefined, [media], 'en').media).toBeUndefined()
+		expect(relationTarget(config, field, { widget: 'media' }, [stores, media], 'en').media).toBeUndefined()
+	})
+
 	it('falls back to the first text field', () => {
 		const target = relationTarget({ collections: {}, version: 1 }, field, undefined, [stores], 'en')
 

@@ -67,9 +67,29 @@ On the edit screen, a `relation` field shows the chosen records by name. "Choose
 - **Search** matches that name field and the related collection's `list.search`. Records are in its `list.sort` order.
 - **Collections outside the config** (such as `users`) work too. PocketBase's list and view rules decide which of their records an editor can choose, and their names are read from `displayField`, `name`, `title` or `email`.
 
+### Files and images
+
+A `file` field shows its stored files, images as thumbnails, with a button to choose a file (or to replace it, or to add more when the field's `maxSelect` is more than 1). New files are uploaded when you save the record, and removed files are deleted then. A file of a type the field's `mimeTypes` refuses, or larger than its `maxSize`, is not taken.
+
+Images are made smaller in the browser before they are uploaded, by `media.compress`:
+
+```json
+{ "media": { "compress": { "maxWidth": 1920, "quality": 0.85, "format": "webp" } } }
+```
+
+| Key        | Default | Meaning                                                                                     |
+| ---------- | ------- | ------------------------------------------------------------------------------------------- |
+| `maxWidth` | `1920`  | Wider images are scaled down to this width; smaller ones are never enlarged                 |
+| `quality`  | `0.85`  | From 0 to 1, for WebP and JPEG                                                              |
+| `format`   | `webp`  | `webp`, `jpeg`, or `keep` for the original type. A browser that cannot write WebP uses JPEG |
+
+This applies to every `file` field, with or without a media library. GIFs (which may be animated) and SVGs are uploaded as they are, and so is any image whose new type the field's `mimeTypes` refuses. The file name gets the new type's extension.
+
+**The media library.** `media` names one collection, such as the `media` preset, as the library of images that every collection shares. When an image is uploaded to its `fileField`, the CMS saves the image's width and height in `widthField` and `heightField` and its type in `mimeField`, so replacing the image on its edit screen updates them too. A `relation` field to that collection with `widget: "media"` gets an image picker in place of the record picker: it shows the chosen images, and its dialog searches the library by the collection's title field (the alt text in the preset) and `list.search`, shows thumbnails, and uploads a new image with its alt text (required) and caption. The thumbnails use a size from the file field's `thumbs` between 120 and 480 pixels, such as `160x160f`, or else PocketBase's `100x100`. Fields with `autofill`, such as the preset's `uploadedBy`, are filled on upload too.
+
 ### Unsaved input
 
-While you type on an edit screen, the CMS keeps the changed fields in the browser's local storage, one draft per editor and record (the new-record screen has one per collection). Opening that screen again asks "You have unsaved changes. Restore them?"; the form can be used once you choose to restore or discard. A restore puts back only the changed fields and sends nothing until you save. The draft is removed when you save or delete the record, discard it, or undo the changes yourself. Signing out with the sign-out button removes all of that editor's drafts, so a shared computer keeps no unpublished text. A session that expires keeps them, so no input is lost. If the record has an `updated` field and was saved again after the draft was made, the question says so; you can still restore. If the browser's storage is full or blocked, the screens work without drafts.
+While you type on an edit screen, the CMS keeps the changed fields in the browser's local storage, one draft per editor and record (the new-record screen has one per collection). Opening that screen again asks "You have unsaved changes. Restore them?"; the form can be used once you choose to restore or discard. A restore puts back only the changed fields and sends nothing until you save. Chosen files are not kept, since the browser cannot store them. The draft is removed when you save or delete the record, discard it, or undo the changes yourself. Signing out with the sign-out button removes all of that editor's drafts, so a shared computer keeps no unpublished text. A session that expires keeps them, so no input is lost. If the record has an `updated` field and was saved again after the draft was made, the question says so; you can still restore. If the browser's storage is full or blocked, the screens work without drafts.
 
 ### Draft previews on your site
 

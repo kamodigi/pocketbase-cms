@@ -7,10 +7,16 @@ import {
 	type SchemaField,
 } from '#lib/config/index.js'
 import { titleFieldName } from '#lib/list/model.js'
+import { compressOptions, type CompressOptions } from '#lib/media/compress.js'
+import { type MediaFields, mediaFields } from '#lib/media/library.js'
 import { type RelationTarget, relationTarget } from '#lib/relation/target.js'
 import { m } from '#paraglide/messages.js'
 
 export interface FormField {
+	/**
+	For files: how images are made smaller before they are uploaded (decision 39).
+	*/
+	compress?: CompressOptions
 	config?: FieldConfig
 	field: SchemaField
 	help?: string
@@ -44,6 +50,10 @@ export interface FormModel {
 	*/
 	autofill: { kind: 'currentUser' | 'now'; name: string }[]
 	main: FormField[]
+	/**
+	Set on the media library's form: the fields an uploaded image's size and type are saved in.
+	*/
+	media?: MediaFields
 	side: FormField[]
 	/**
 	The PocketBase field that names a record.
@@ -52,14 +62,16 @@ export interface FormModel {
 }
 
 /**
-The input a field gets. `pending` is a type whose input comes in a later version (file);
-its value is shown nowhere and never sent.
+The input a field gets. `pending` is a type the CMS has no input for yet; its value is shown nowhere
+and never sent.
 */
 export type InputKind =
 	| 'autodate'
 	| 'checkboxes'
 	| 'date'
 	| 'datetime'
+	| 'file'
+	| 'files'
 	| 'number'
 	| 'pending'
 	| 'relation'
@@ -147,6 +159,7 @@ export function buildFormModel(
 		const kind = inputKind(field, fieldConfig)
 		return [
 			{
+				compress: field.type === 'file' ? compressOptions(config.media?.compress) : undefined,
 				config: fieldConfig,
 				field,
 				help: fieldConfig?.help === undefined ? undefined : resolveLabel(fieldConfig.help, uiLocale, ''),
@@ -179,7 +192,13 @@ export function buildFormModel(
 		;(field.type === 'autodate' ? side : main).push(...toField(field.name))
 	}
 
-	return { autofill, main, side, titleField: resolveName(titleFieldName(config, schema)) }
+	return {
+		autofill,
+		main,
+		media: mediaFields(config, schema.name),
+		side,
+		titleField: resolveName(titleFieldName(config, schema)),
+	}
 }
 
 /**
@@ -201,11 +220,14 @@ export function inputKind(field: SchemaField, config: FieldConfig | undefined): 
 			// Raw HTML until the rich text editor arrives; PocketBase sanitizes it on save (decision 11).
 			return 'textarea'
 		}
+		case 'file': {
+			return isMultiple(field) ? 'files' : 'file'
+		}
 		case 'number': {
 			return 'number'
 		}
 		case 'relation': {
-			// `widget: "media"` gets the same picker until the image picker arrives.
+			// `widget: "media"` on a relation to the media library gets the image picker (see RelationTarget).
 			return isMultiple(field) ? 'relations' : 'relation'
 		}
 		case 'select': {
@@ -226,7 +248,7 @@ export function inputKind(field: SchemaField, config: FieldConfig | undefined): 
 }
 
 /**
-Whether a select or relation field holds a list of values.
+Whether a select, relation or file field holds a list of values.
 */
 export function isMultiple(field: SchemaField): boolean {
 	return (field.maxSelect ?? 1) > 1

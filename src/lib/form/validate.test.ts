@@ -82,6 +82,14 @@ describe('validateField on a relation', () => {
 		expect(check(several, ['a', 'b', 'c', 'd'])).toBe('Choose up to 3.')
 		expect(check({ maxSelect: 1, required: true, type: 'relation' }, '')).toBe('This field is required.')
 	})
+
+	it('counts the files of a file field', () => {
+		const photo = new File(['x'], 'a.png', { type: 'image/png' })
+		expect(check({ required: true, type: 'file' }, [])).toBe('This field is required.')
+		expect(check({ required: true, type: 'file' }, [photo])).toBeUndefined()
+		expect(check({ maxSelect: 2, type: 'file' }, ['a.png', photo])).toBeUndefined()
+		expect(check({ maxSelect: 2, type: 'file' }, ['a.png', 'b.png', photo])).toBe('Up to 2 files.')
+	})
 })
 
 describe('validateForm', () => {
@@ -92,7 +100,7 @@ describe('validateForm', () => {
 				fields: [
 					{ name: 'code', required: true, type: 'text' },
 					{ name: 'title', required: true, type: 'text' },
-					{ name: 'file', required: true, type: 'file' },
+					{ name: 'location', required: true, type: 'geoPoint' },
 				],
 				name: 'c',
 			},

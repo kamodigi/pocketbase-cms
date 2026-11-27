@@ -49,9 +49,17 @@ export interface SchemaField {
 	*/
 	max?: null | number | string
 	/**
-	For select and relation fields: up to how many values can be chosen; 0 or 1 means one.
+	For select, relation and file fields: up to how many values can be chosen; 0 or 1 means one.
 	*/
 	maxSelect?: number
+	/**
+	For file fields: the largest file in bytes; 0 means PocketBase's default (5 MB).
+	*/
+	maxSize?: number
+	/**
+	For file fields: the MIME types accepted; empty for any.
+	*/
+	mimeTypes?: null | string[]
 	/**
 	Like `max`, the shortest length, smallest value or earliest date.
 	*/
@@ -82,6 +90,10 @@ export interface SchemaField {
 	PocketBase refuses a blank value: an empty text, 0, false, no date or no choice.
 	*/
 	required?: boolean
+	/**
+	For file fields: the thumbnail sizes PocketBase makes of images, such as "160x160f".
+	*/
+	thumbs?: null | string[]
 	type: string
 	/**
 	For select fields: the values that can be chosen.

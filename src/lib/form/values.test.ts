@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { SchemaCollection } from '#lib/config/index.js'
 
 import { buildFormModel } from './model'
-import { initialValues, recordPayload, slugify } from './values'
+import { initialValues, recordPayload, slugify, snapshotValues } from './values'
 
 const stores: SchemaCollection = {
 	fields: [
@@ -110,6 +110,101 @@ describe('recordPayload', () => {
 		// The seconds of reviewed_at are not lost, because it is not sent.
 		expect(recordPayload(model, values, { initial, now, userId: 'u9' })).toEqual({ seats: 0, tags: ['a', 'b'] })
 		expect(recordPayload(model, initial, { initial, now })).toEqual({})
+	})
+})
+
+describe('recordPayload with files', () => {
+	const schema: SchemaCollection = {
+		fields: [
+			{ name: 'cover', type: 'file' },
+			{ maxSelect: 5, name: 'gallery', type: 'file' },
+		],
+		name: 'pages',
+	}
+	const pages = buildFormModel({ collections: { pages: {} }, version: 1 }, schema, 'en')
+	const saved = { cover: 'old.webp', gallery: ['a.webp', 'b.webp'], id: 'p1' } as unknown as RecordModel
+	const photo = new File(['x'], 'new.webp', { type: 'image/webp' })
+
+	it('reads stored names as lists', () => {
+		expect(initialValues(pages, saved)).toEqual({ cover: ['old.webp'], gallery: ['a.webp', 'b.webp'] })
+		expect(initialValues(pages, undefined)).toEqual({ cover: [], gallery: [] })
+	})
+
+	it('sends new files on create', () => {
+		expect(recordPayload(pages, { cover: [photo], gallery: [photo] }, { now })).toEqual({
+			cover: photo,
+			gallery: [photo],
+		})
+		expect(recordPayload(pages, { cover: [], gallery: [] }, { now })).toEqual({ cover: '', gallery: [] })
+	})
+
+	it('replaces or removes a single file', () => {
+		const initial = initialValues(pages, saved)
+		expect(recordPayload(pages, { ...initial, cover: [photo] }, { initial, now })).toEqual({ cover: photo })
+		expect(recordPayload(pages, { ...initial, cover: [] }, { initial, now })).toEqual({ cover: '' })
+	})
+
+	it('changes several files with the remove and append modifiers', () => {
+		const initial = initialValues(pages, saved)
+		expect(recordPayload(pages, { ...initial, gallery: ['b.webp', photo] }, { initial, now })).toEqual({
+			'gallery+': [photo],
+			'gallery-': ['a.webp'],
+		})
+		expect(recordPayload(pages, { ...initial, gallery: [] }, { initial, now })).toEqual({
+			'gallery-': ['a.webp', 'b.webp'],
+		})
+	})
+
+	it('saves the size and type of an image uploaded to the media library', async () => {
+		const { prepareFile } = await import('#lib/media/compress.js')
+		const media = buildFormModel(
+			{
+				collections: { media: { fields: { width: { readonly: true } } } },
+				media: {
+					collection: 'media',
+					fileField: 'file',
+					heightField: 'height',
+					mimeField: 'mime',
+					widthField: 'width',
+				},
+				version: 1,
+			},
+			{
+				fields: [
+					{ name: 'file', type: 'file' },
+					{ name: 'width', type: 'number' },
+					{ name: 'height', type: 'number' },
+					{ name: 'mime', type: 'text' },
+				],
+				name: 'media',
+			},
+			'en',
+		)
+		const codec = { decode: async () => ({ height: 30, width: 40 }), encode: async () => new Blob() }
+		const { file } = await prepareFile(new File(['x'], 'a.gif', { type: 'image/gif' }), media.main[0]!.compress!, {
+			codec,
+		})
+		const initial = initialValues(media, { file: 'old.gif', height: 1, id: 'm1', mime: 'image/gif', width: 1 } as never)
+
+		// The width is read-only on the form, yet filled from the image.
+		expect(recordPayload(media, { ...initial, file: [file] }, { initial, now })).toEqual({
+			file,
+			height: 30,
+			mime: 'image/gif',
+			width: 40,
+		})
+	})
+})
+
+describe('snapshotValues', () => {
+	it('copies the lists and keeps the chosen files themselves', () => {
+		const photo = new File(['x'], 'a.png', { type: 'image/png' })
+		const values = { files: ['old.png', photo], title: 'Pier' }
+		const copy = snapshotValues(values)
+
+		expect(copy).toEqual(values)
+		expect(copy.files).not.toBe(values.files)
+		expect((copy.files as unknown[])[1]).toBe(photo)
 	})
 })
 

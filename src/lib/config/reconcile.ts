@@ -27,7 +27,37 @@ export interface SchemaCollection {
 A field definition as PocketBase returns it. Only the properties the CMS reads are listed.
 */
 export interface SchemaField {
+	/**
+	For url fields: the only domains allowed, or the domains refused.
+	*/
+	exceptDomains?: null | string[]
+	/**
+	Set on fields PocketBase hides from the API (an auth collection's password).
+	*/
+	hidden?: boolean
+	/**
+	Text: the longest length in characters (0 means PocketBase's default). Number: the largest value.
+	Date: the latest date, or "". Select: unused.
+	*/
+	max?: null | number | string
+	/**
+	For select fields: up to how many values can be chosen; 0 or 1 means one.
+	*/
+	maxSelect?: number
+	/**
+	Like `max`, the shortest length, smallest value or earliest date.
+	*/
+	min?: null | number | string
 	name: string
+	onlyDomains?: null | string[]
+	/**
+	For number fields: whole numbers only.
+	*/
+	onlyInt?: boolean
+	/**
+	For text fields: a regular expression a non-empty value must match.
+	*/
+	pattern?: string
 	/**
 	Set on the `id` field.
 	*/
@@ -36,7 +66,15 @@ export interface SchemaField {
 	For file fields: files need a file token to be read.
 	*/
 	protected?: boolean
+	/**
+	PocketBase refuses a blank value: an empty text, 0, false, no date or no choice.
+	*/
+	required?: boolean
 	type: string
+	/**
+	For select fields: the values that can be chosen.
+	*/
+	values?: string[]
 }
 
 /**

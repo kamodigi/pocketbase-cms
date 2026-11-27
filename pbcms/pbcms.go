@@ -16,6 +16,7 @@ func Register(app core.App) {
 		Id: "pbcmsRoutes",
 		Func: func(e *core.ServeEvent) error {
 			e.Router.GET("/api/cms/schema", schemaHandler)
+			registerPreviewRoutes(e)
 			return e.Next()
 		},
 	})

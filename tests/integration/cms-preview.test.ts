@@ -39,7 +39,7 @@ const previewStatus = async (url: string, collection: string, id: string, token?
 const createDraft = async (editor: PocketBase, body = '<p>Draft</p>') =>
 	editor.collection('posts').create({ body, draft: true, slug: uniqueId(), title: 'Draft post' })
 
-// hooks/pb_hooks/pbcms_preview.pb.js
+// hooks/pb_hooks/pbcms_preview.pb.js, or pbcms/preview.go with PBCMS_POCKETBASE=go.
 describe('preview tokens and GET /api/cms/preview', () => {
 	let server: PocketBaseServer
 	let editor: PocketBase

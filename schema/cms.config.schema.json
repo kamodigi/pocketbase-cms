@@ -81,10 +81,12 @@
 			}
 		},
 		"editor": {
+			"description": "What the rich text editor offers. A field's own features or headingLevels replace the top-level ones.",
 			"type": "object",
 			"additionalProperties": false,
 			"properties": {
 				"features": {
+					"description": "The editor's tools. Default: all. image needs the media library.",
 					"type": "array",
 					"uniqueItems": true,
 					"items": {
@@ -108,7 +110,12 @@
 						]
 					}
 				},
-				"headingLevels": { "type": "array", "items": { "enum": [1, 2, 3, 4, 5, 6] }, "uniqueItems": true }
+				"headingLevels": {
+					"description": "The heading levels offered. Default: [2, 3, 4].",
+					"type": "array",
+					"items": { "enum": [1, 2, 3, 4, 5, 6] },
+					"uniqueItems": true
+				}
 			}
 		},
 		"collection": {

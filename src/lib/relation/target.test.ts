@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 import type { CmsConfig, SchemaCollection, SchemaField } from '#lib/config/index.js'
 
 import { nameKeys, recordName } from './name'
-import { relationTarget } from './target'
+import { mediaTarget, relationTarget } from './target'
 
 const stores: SchemaCollection = {
 	fields: [
@@ -99,6 +99,33 @@ describe('relationTarget', () => {
 
 		expect(target).toMatchObject({ collection: '_pb_users_auth_', defaultSort: '' })
 		expect(target.searchFields).toBeUndefined()
+	})
+})
+
+describe('mediaTarget', () => {
+	it('is the media library as a target, or undefined without one', () => {
+		const media: SchemaCollection = {
+			fields: [
+				{ name: 'file', type: 'file' },
+				{ name: 'alt', type: 'text' },
+			],
+			id: 'col_media',
+			name: 'media',
+		}
+		const config: CmsConfig = {
+			collections: { media: { list: { search: ['alt'], sort: '-created' }, titleField: 'alt' } },
+			media: { altField: 'alt', collection: 'media', fileField: 'file' },
+			version: 1,
+		}
+
+		expect(mediaTarget(config, [media], 'en')).toMatchObject({
+			collection: 'media',
+			defaultSort: '-created',
+			media: { altField: 'alt', collection: 'media' },
+			searchFields: ['alt'],
+		})
+		expect(mediaTarget({ ...config, media: undefined }, [media], 'en')).toBeUndefined()
+		expect(mediaTarget(config, [], 'en')).toBeUndefined()
 	})
 })
 

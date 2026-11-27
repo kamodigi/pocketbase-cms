@@ -134,6 +134,34 @@ describe('buildFormModel', () => {
 	})
 })
 
+describe('buildFormModel for rich text', () => {
+	it('gives a rich text field the editor settings, with images from the media library', () => {
+		const media: SchemaCollection = { fields: [{ name: 'file', type: 'file' }], id: 'col_media', name: 'media' }
+		const posts: SchemaCollection = {
+			fields: [
+				{ name: 'body', type: 'editor' },
+				{ name: 'note', type: 'editor' },
+			],
+			id: 'col_posts',
+			name: 'posts',
+		}
+		const config: CmsConfig = {
+			collections: { posts: { fields: { note: { editor: { features: ['bold'] } } } } },
+			editor: { headingLevels: [3, 2] },
+			media: { collection: 'media', fileField: 'file' },
+			version: 1,
+		}
+
+		const [body, note] = buildFormModel(config, posts, 'en', [posts, media]).main
+
+		expect(body?.kind).toBe('richtext')
+		expect(body?.richText?.headingLevels).toEqual([2, 3])
+		expect(body?.richText?.images?.collection).toBe('media')
+		expect([...note!.richText!.features]).toEqual(['bold'])
+		expect(note?.richText?.images).toBeUndefined()
+	})
+})
+
 describe('formEntries', () => {
 	it('puts the locales of a localized field in one entry, where its first locale is', () => {
 		const schema: SchemaCollection = {
@@ -172,5 +200,8 @@ describe('inputKind', () => {
 		expect(inputKind({ name: 'a', type: 'geoPoint' }, undefined)).toBe('pending')
 		expect(inputKind({ maxSelect: 1, name: 'a', type: 'relation' }, { widget: 'media' })).toBe('relation')
 		expect(inputKind({ maxSelect: 3, name: 'a', type: 'relation' }, undefined)).toBe('relations')
+		expect(inputKind({ name: 'a', type: 'editor' }, undefined)).toBe('richtext')
+		expect(inputKind({ name: 'a', type: 'editor' }, { widget: 'richtext' })).toBe('richtext')
+		expect(inputKind({ name: 'a', type: 'editor' }, { widget: 'textarea' })).toBe('textarea')
 	})
 })

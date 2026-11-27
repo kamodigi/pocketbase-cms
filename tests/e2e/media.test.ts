@@ -83,6 +83,8 @@ test('an image is uploaded to the media library smaller, and replaced', async ({
 	await page.getByRole('button', { name: 'Create' }).click()
 	await expect(page.getByText(`Created “Lantern ${tag}”.`)).toBeVisible()
 
+	// The screen moves to the new record's address after the message.
+	await expect(page).toHaveURL(/#\/collections\/media\/(?!new$)\w+$/)
 	const id = /#\/collections\/media\/(\w+)$/.exec(page.url())?.[1]
 	const created = await editor.collection('media').getOne(id!)
 	expect(created).toMatchObject({

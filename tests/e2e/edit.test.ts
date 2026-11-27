@@ -114,8 +114,7 @@ test('a post gets a slug from its title, and a taken slug is refused', async ({ 
 	await page.getByRole('option', { name: 'Event' }).click()
 	await page.getByLabel('Published at').fill('2030-04-01T09:30')
 	await page.getByRole('checkbox', { name: 'Draft' }).check()
-	// The body is HTML until the rich text editor arrives.
-	await page.getByRole('textbox', { name: 'Body' }).fill('<p>Cupping at the pier.</p>')
+	await page.getByRole('textbox', { name: 'Body' }).fill('Cupping at the pier.')
 	await page.getByRole('button', { name: 'Create' }).click()
 
 	// PocketBase refuses the slug; its message is shown at the field.

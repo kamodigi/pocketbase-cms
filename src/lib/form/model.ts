@@ -6,10 +6,11 @@ import {
 	type SchemaCollection,
 	type SchemaField,
 } from '#lib/config/index.js'
+import { type EditorSettings, editorSettings } from '#lib/editor/settings.js'
 import { titleFieldName } from '#lib/list/model.js'
 import { compressOptions, type CompressOptions } from '#lib/media/compress.js'
 import { type MediaFields, mediaFields } from '#lib/media/library.js'
-import { type RelationTarget, relationTarget } from '#lib/relation/target.js'
+import { mediaTarget, type RelationTarget, relationTarget } from '#lib/relation/target.js'
 import { m } from '#paraglide/messages.js'
 
 /**
@@ -50,6 +51,10 @@ export interface FormField {
 	*/
 	relation?: RelationTarget
 	/**
+	For rich text: what the editor offers, and the media library its images come from.
+	*/
+	richText?: EditorSettings
+	/**
 	For slugs: the PocketBase field a slug is suggested from.
 	*/
 	slugFrom?: string
@@ -87,6 +92,7 @@ export type InputKind =
 	| 'pending'
 	| 'relation'
 	| 'relations'
+	| 'richtext'
 	| 'select'
 	| 'slug'
 	| 'text'
@@ -147,6 +153,10 @@ export function buildFormModel(
 	for (const key of Object.keys(fieldConfigs)) expand(key)
 	const resolveName = (key: string | undefined): string | undefined => (key === undefined ? undefined : expand(key)[0])
 
+	// The media library as a picker target, made once for every rich text field.
+	let images: RelationTarget | undefined
+	const imagesTarget = (): RelationTarget | undefined => (images ??= mediaTarget(config, collections, uiLocale))
+
 	const autofill: FormModel['autofill'] = []
 	const isShown = (field: SchemaField): boolean => {
 		const fieldConfig = fieldConfigs[configKeyOf.get(field.name) ?? field.name]
@@ -184,6 +194,7 @@ export function buildFormModel(
 				readonly: kind === 'autodate' || Boolean(fieldConfig?.readonly),
 				relation:
 					field.type === 'relation' ? relationTarget(config, field, fieldConfig, collections, uiLocale) : undefined,
+				richText: kind === 'richtext' ? editorSettings(config.editor, fieldConfig?.editor, imagesTarget()) : undefined,
 				slugFrom: kind === 'slug' ? resolveName(fieldConfig?.slugFrom) : undefined,
 			},
 		]
@@ -253,8 +264,8 @@ export function inputKind(field: SchemaField, config: FieldConfig | undefined): 
 			return widget === 'date' ? 'date' : 'datetime'
 		}
 		case 'editor': {
-			// Raw HTML until the rich text editor arrives; PocketBase sanitizes it on save (decision 11).
-			return 'textarea'
+			// `widget: "textarea"` edits the HTML itself. PocketBase sanitizes it on save either way (decision 11).
+			return widget === 'textarea' ? 'textarea' : 'richtext'
 		}
 		case 'file': {
 			return isMultiple(field) ? 'files' : 'file'

@@ -6,7 +6,7 @@
 	import ImageIcon from '@lucide/svelte/icons/image'
 	import XIcon from '@lucide/svelte/icons/x'
 	import { ClientResponseError } from 'pocketbase'
-	import { onDestroy, onMount, tick, untrack } from 'svelte'
+	import { onMount, tick, untrack } from 'svelte'
 	import { SvelteMap, SvelteSet } from 'svelte/reactivity'
 
 	import type { FormField } from '#lib/form/model.js'
@@ -14,15 +14,12 @@
 
 	import { signOut } from '#lib/auth/auth.js'
 	import { Button } from '#lib/components/ui/button/index.js'
-	import * as Dialog from '#lib/components/ui/dialog/index.js'
-	import { Input } from '#lib/components/ui/input/index.js'
-	import { Label } from '#lib/components/ui/label/index.js'
 	import { pb } from '#lib/pocketbase.js'
-	import { fetchChosen, searchRecords } from '#lib/relation/records.js'
+	import { fetchChosen } from '#lib/relation/records.js'
 	import { m } from '#paraglide/messages.js'
 
 	import { mediaFileName, pickerThumb } from './library'
-	import MediaUpload from './media-upload.svelte'
+	import MediaPicker from './media-picker.svelte'
 
 	interface Props {
 		describedBy?: string
@@ -47,8 +44,6 @@
 	const isMultiple = untrack(() => field.kind === 'relations')
 	const max = untrack(() => field.field.maxSelect ?? 1)
 	const thumb = untrack(() => pickerThumb(library.file))
-	const searchDelay = 300
-	const id = $props.id()
 
 	const chosen = $derived(
 		Array.isArray(value) ? value.map(String) : typeof value === 'string' && value !== '' ? [value] : [],
@@ -61,16 +56,6 @@
 	let token = $state<string>()
 
 	let isOpen = $state(false)
-	let search = $state('')
-	let searched = $state('')
-	let results = $state<RecordModel[]>([])
-	let page = $state(0)
-	let totalPages = $state(0)
-	let total = $state(0)
-	let isSearching = $state(false)
-	let searchError = $state('')
-	let timer: ReturnType<typeof setTimeout> | undefined
-	let latest = 0
 	// eslint-disable-next-line unicorn/no-null -- the empty value of the button's `ref`
 	let chooseButton = $state<HTMLElement | null>(null)
 
@@ -82,8 +67,6 @@
 		const ids = chosen
 		untrack(() => void nameChosen(ids))
 	})
-
-	onDestroy(() => clearTimeout(timer))
 
 	function altOf(record: RecordModel | undefined, recordId: string): string {
 		const alt: unknown = record && library.altField ? record[library.altField] : undefined
@@ -113,26 +96,6 @@
 		return m.relation_error({ message: error.message })
 	}
 
-	async function load(next: number) {
-		const request = ++latest
-		const text = searched
-		isSearching = true
-		searchError = ''
-		try {
-			const result = await searchRecords(pb, target, { page: next, search: text })
-			if (request !== latest) return
-			const seen = new Set(next === 1 ? [] : results.map(record => record.id))
-			results = [...(next === 1 ? [] : results), ...result.items.filter(record => !seen.has(record.id))]
-			page = result.page
-			total = result.totalItems
-			totalPages = result.totalPages
-		} catch (error) {
-			if (request !== latest) return
-			searchError = failure(error)
-		}
-		isSearching = false
-	}
-
 	async function nameChosen(ids: string[]) {
 		const missing = ids.filter(item => !known.has(item) && !asked.has(item))
 		if (missing.length === 0) return
@@ -152,54 +115,16 @@
 		}
 	}
 
-	function opened(isNowOpen: boolean) {
-		clearTimeout(timer)
-		if (!isNowOpen) {
-			latest++
-			return
-		}
-		search = ''
-		startSearch()
-	}
-
 	async function remove(recordId: string) {
 		onchange(isMultiple ? chosen.filter(item => item !== recordId) : '')
 		await tick()
 		chooseButton?.focus()
 	}
 
-	function scheduleSearch(event: Event) {
-		clearTimeout(timer)
-		if (event instanceof InputEvent && event.isComposing) return
-		timer = setTimeout(() => {
-			if (search.trim() !== searched) startSearch()
-		}, searchDelay)
-	}
-
-	function startSearch() {
-		clearTimeout(timer)
-		searched = search.trim()
-		results = []
-		page = 0
-		totalPages = 0
-		void load(1)
-	}
-
-	function submitSearch(event: SubmitEvent) {
-		event.preventDefault()
-		startSearch()
-	}
-
 	function thumbnailOf(record: RecordModel | undefined): string | undefined {
 		const name = record && mediaFileName(library, record)
 		const isReadable = token !== undefined || !library.file.protected
 		return record && name && isReadable ? pb.files.getURL(record, name, { thumb, token }) : undefined
-	}
-
-	function uploaded(record: RecordModel) {
-		results = [record, ...results.filter(item => item.id !== record.id)]
-		total++
-		choose(record)
 	}
 </script>
 
@@ -243,105 +168,29 @@
 {/if}
 
 {#if !field.readonly}
-	<Dialog.Root onOpenChange={opened} bind:open={isOpen}>
-		<Dialog.Trigger>
-			{#snippet child({ props })}
-				<Button
-					{...props}
-					class="justify-self-start"
-					aria-describedby={describedBy}
-					aria-invalid={invalid}
-					variant="outline"
-					bind:ref={chooseButton}
-				>
-					{m.relation_choose({ field: field.label })}
-				</Button>
-			{/snippet}
-		</Dialog.Trigger>
-		<Dialog.Content class="flex max-h-[90dvh] flex-col sm:max-w-3xl" showCloseButton={false}>
-			<Dialog.Header>
-				<Dialog.Title>{m.relation_choose({ field: field.label })}</Dialog.Title>
-				{#if isMultiple}
-					<Dialog.Description aria-live="polite">
-						{m.relation_selected({ count: chosen.length, max })}
-					</Dialog.Description>
-				{/if}
-			</Dialog.Header>
-
-			<div class="grid min-h-0 flex-1 gap-4 overflow-y-auto p-1">
-				<form class="grid gap-1.5" onsubmit={submitSearch} role="search">
-					<Label for="{id}-search">{m.relation_search()}</Label>
-					<Input
-						id="{id}-search"
-						autocomplete="off"
-						oncompositionend={scheduleSearch}
-						oninput={scheduleSearch}
-						type="search"
-						bind:value={search}
-					/>
-				</form>
-
-				<div class="grid gap-2">
-					{#if results.length > 0}
-						<ul class="grid grid-cols-[repeat(auto-fill,minmax(7.5rem,1fr))] gap-2" aria-label={field.label}>
-							{#each results as record (record.id)}
-								{@const isChosen = chosen.includes(record.id)}
-								<li>
-									<button
-										class="hover:bg-muted focus-visible:ring-ring/50 aria-pressed:border-primary aria-pressed:bg-accent grid w-full gap-1 rounded-lg border border-transparent p-1.5 text-left text-sm outline-none focus-visible:ring-3 disabled:opacity-50"
-										aria-pressed={isChosen}
-										disabled={isMultiple && !isChosen && chosen.length >= max}
-										onclick={() => choose(record)}
-										type="button"
-									>
-										{@render image(record, 'aspect-square w-full')}
-										<span class="line-clamp-2 min-w-0 px-0.5 break-words">{altOf(record, record.id)}</span>
-									</button>
-								</li>
-							{/each}
-						</ul>
-					{/if}
-					<p class="text-muted-foreground px-1 text-sm" role="status">
-						{#if isSearching}
-							{m.relation_loading()}
-						{:else if searchError === ''}
-							{#if results.length > 0}
-								{m.list_total({ count: total })}
-							{:else}
-								{searched === '' ? m.media_empty() : m.media_no_results()}
-							{/if}
-						{/if}
-					</p>
-					{#if searchError}
-						<div class="grid justify-items-start gap-2 px-1">
-							<p class="text-destructive text-sm" role="alert">{searchError}</p>
-							<Button onclick={() => load(page + 1)} size="sm" variant="outline">{m.relation_retry()}</Button>
-						</div>
-					{:else if page < totalPages}
-						<Button
-							class="justify-self-start"
-							disabled={isSearching}
-							onclick={() => load(page + 1)}
-							size="sm"
-							variant="outline"
-						>
-							{m.relation_load_more()}
-						</Button>
-					{/if}
-				</div>
-
-				{#if !isMultiple || chosen.length < max}
-					<MediaUpload {library} onuploaded={uploaded} {uiLocale} />
-				{/if}
-			</div>
-
-			<Dialog.Footer>
-				<Dialog.Close>
-					{#snippet child({ props })}
-						<Button {...props} variant="outline">{isMultiple ? m.relation_done() : m.relation_close()}</Button>
-					{/snippet}
-				</Dialog.Close>
-			</Dialog.Footer>
-		</Dialog.Content>
-	</Dialog.Root>
+	<MediaPicker
+		canUpload={!isMultiple || chosen.length < max}
+		{chosen}
+		closeLabel={isMultiple ? m.relation_done() : m.relation_close()}
+		description={isMultiple ? m.relation_selected({ count: chosen.length, max }) : undefined}
+		isFull={isMultiple && chosen.length >= max}
+		onchoose={choose}
+		{target}
+		title={m.relation_choose({ field: field.label })}
+		{uiLocale}
+		bind:open={isOpen}
+	>
+		{#snippet trigger({ props })}
+			<Button
+				{...props}
+				class="justify-self-start"
+				aria-describedby={describedBy}
+				aria-invalid={invalid}
+				variant="outline"
+				bind:ref={chooseButton}
+			>
+				{m.relation_choose({ field: field.label })}
+			</Button>
+		{/snippet}
+	</MediaPicker>
 {/if}

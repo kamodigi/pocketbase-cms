@@ -55,13 +55,13 @@ test('an event is written in each locale by switching tabs, and saved', async ({
 
 	await title.fill(`Cupping night ${tag}`)
 	await expect(page.getByRole('textbox', { name: /^Slug/ })).toHaveValue(`cupping-night-${tag}`)
-	await body.fill('<p>At the pier.</p>')
+	await body.fill('At the pier.')
 	// One tab switches every localized input.
 	await bodyTabs.getByRole('tab', { name: 'Simplified Chinese' }).click()
 	await expect(titleTabs.getByRole('tab', { name: 'Simplified Chinese' })).toHaveAttribute('aria-selected', 'true')
 	await expect(title).toHaveValue('')
 	await title.fill(`杯测之夜 ${tag}`)
-	await body.fill('<p>在码头。</p>')
+	await body.fill('在码头。')
 	await page.getByRole('checkbox', { name: 'Draft' }).check()
 	await page.getByRole('button', { name: 'Create' }).click()
 
@@ -86,7 +86,7 @@ test('an event is written in each locale by switching tabs, and saved', async ({
 	await expect(title).toHaveValue(`Cupping night ${tag}`)
 	await titleTabs.getByRole('tab', { name: 'Japanese' }).click()
 	await expect(title).toHaveValue(`カッピングの夜 ${tag}`)
-	await body.fill('<p>桟橋で。</p>')
+	await body.fill('桟橋で。')
 	await expect(bodyTabs.getByRole('tab', { name: 'Japanese' })).toHaveText('Japanese')
 	await page.getByRole('button', { name: 'Save' }).click()
 	await expect(page.getByText(`Saved “Cupping night ${tag}”.`)).toBeVisible()

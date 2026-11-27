@@ -59,6 +59,10 @@ A collection's screen is a table of its records.
 
 The page, search, filter and sort are kept in the URL, so reloading and going back keep them. A localized field shows, searches and sorts the first locale in `locales`. A collection with `singleton: true` has no list: the CMS opens its one record.
 
+### Unsaved input
+
+While you type on an edit screen, the CMS keeps the changed fields in the browser's local storage, one draft per editor and record (the new-record screen has one per collection). Opening that screen again asks "You have unsaved changes. Restore them?"; the form can be used once you choose to restore or discard. A restore puts back only the changed fields and sends nothing until you save. The draft is removed when you save or delete the record, discard it, or undo the changes yourself. Signing out keeps it, so an expired session loses no input; it stays in that browser, under that editor's account, until one of the above. If the browser's storage is full or blocked, the screens work without drafts.
+
 ## PocketBase hooks
 
 The JavaScript hooks live in [`hooks/pb_hooks/`](hooks/pb_hooks). Copy the files you need, together with the `pbcms/` folder they load, into your PocketBase's `pb_hooks/`.

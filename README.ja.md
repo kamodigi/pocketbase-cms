@@ -62,9 +62,24 @@ CMS は本文中の画像を `<img src="…" data-media-id="<media のレコー�
 
 データベースに HTML が入る経路は、PocketBase を通した保存だけではありません。フックを入れる前に保存したレコード、バックアップからの復元、生の SQL、サニタイズのあとで値を書き換える別のフックは、保存時の無害化を通りません。そのため、メディアのフックは応答でもすべての `editor` 型の項目を無害化します。`media` を使わない場合も、両方のフックを入れてください。
 
+### Go パッケージ
+
+Go で組み立てた PocketBase では、JavaScript のフックの代わりに `pbcms` パッケージを使います。PocketBase の v0.41 からのモジュールのパス `ganigeorgiev.com/pocketbase/pocketbase` に合わせてあります。
+
+```sh
+go get github.com/kamodigi/pocketbase-cms/pbcms
+```
+
+```go
+app := pocketbase.New()
+pbcms.Register(app)
+```
+
+`pbcms.Register` は `GET /api/cms/schema` を追加します。応答・権限の判定・`PBCMS_CONFIG_PATH` の扱いは `pbcms_schema.pb.js` と同じなので、このフックは一緒に入れないでください。ほかのフックはまだパッケージにありません。それまでは、[`tests/gopocketbase/main.go`](tests/gopocketbase/main.go) と同じように PocketBase の `jsvm` プラグインを登録し、`pbcms_sanitize.pb.js` と `pbcms_media_urls.pb.js` を `pb_hooks/` に置いてください。
+
 ## 開発
 
-必要なもの：Node.js 22 以上と pnpm
+必要なもの：Node.js 22 以上と pnpm。Go パッケージには Go 1.27 以上が必要です。
 
 ```sh
 pnpm install
@@ -73,16 +88,23 @@ pnpm check    # 型チェック
 pnpm lint     # prettier と eslint
 pnpm test     # ユニットテスト
 pnpm build    # build/ に静的ファイルを書き出す
+go vet ./... && go test ./...   # Go パッケージ
 ```
 
 ### 統合テストと E2E
 
-どちらも本物の PocketBase に対して動きます。`compose.yaml` のバージョンの公式バイナリ（初回に `node_modules/.cache/pocketbase/` にダウンロード）を、例のプリセットと開発用のアカウントつきで、使い捨てのデータディレクトリで起動します。終わるとデータは消えます。Docker は不要です。
+どちらも本物の PocketBase に対して動きます。`compose.yaml` のバージョンの公式バイナリ（初回に [PocketBase のリリース](https://ganigeorgiev.com/pocketbase/pocketbase/releases)から `node_modules/.cache/pocketbase/` にダウンロードし、リリースのチェックサムで確かめる）を、例のプリセットと開発用のアカウントつきで、使い捨てのデータディレクトリで起動します。終わるとデータは消えます。Docker は不要です。
 
 ```sh
 pnpm test:integration                  # API ルールとフック（tests/integration/）
 pnpm exec playwright install chromium  # 最初の E2E の前に一度だけ
 pnpm build && pnpm test:e2e            # pb_public/cms/ に置いたビルド済みの CMS（tests/e2e/）
+```
+
+`PBCMS_POCKETBASE=go` を付けると、同じテストを、公式バイナリの代わりに `tests/gopocketbase/` の Go で組み立てた PocketBase（`pbcms` パッケージ入り。Go が必要）に対して動かします。パッケージが置き換える JavaScript のフックは入れません。CI では両方を動かします。
+
+```sh
+PBCMS_POCKETBASE=go pnpm test:integration
 ```
 
 E2E の PocketBase はポート 8091 で動きます。別のポートにするときは `E2E_PORT` を設定します。
@@ -93,7 +115,7 @@ E2E の PocketBase はポート 8091 で動きます。別のポートにする�
 
 ## 開発用の PocketBase で試す
 
-`compose.yaml` は、公式バイナリの PocketBase（v0.40.6。正式に対応するのは最新のマイナーバージョンだけ）を、`examples/` のプリセットつきで起動します。Docker Compose が必要です。
+`compose.yaml` は、公式バイナリの PocketBase（v0.42.3。正式に対応するのは最新のマイナーバージョンだけ。`go.mod` も同じバージョン）を、`examples/` のプリセットつきで起動します。Docker Compose が必要です。
 
 ```sh
 docker compose up -d --build   # PocketBase: http://localhost:8090

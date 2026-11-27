@@ -18,6 +18,21 @@ It reads your collection schema at runtime and builds the list and edit screens 
 - Field inputs come from your collection schema. A `cms.config.json` file next to the app only sets labels, ordering, list columns and similar presentation details.
 - A small PocketBase hook (JavaScript `pb_hooks` or a Go package) exposes the schema to editors, sanitizes rich text on save, and can notify your site when content changes.
 
+## Installation
+
+Every [release](https://github.com/kamodigi/pocketbase-cms/releases) comes in two forms. Replace `0.1.0` below with the version you want.
+
+**Docker image.** `ghcr.io/kamodigi/pocketbase-cms` holds the built CMS in `/dist`. You never run it; your PocketBase image copies the files out of it:
+
+```dockerfile
+COPY --from=ghcr.io/kamodigi/pocketbase-cms:0.1.0 /dist /pb/pb_public/cms
+COPY cms.config.json /pb/pb_public/cms/config.json
+```
+
+The image holds the CMS only. Take the [PocketBase hooks](#pocketbase-hooks) from the zip of the same version, or use the Go package.
+
+**Zip.** `pocketbase-cms_0.1.0.zip`, attached to the release, holds `cms/` (the built CMS), `pb_hooks/` (the JavaScript hooks) and the license. Copy `cms/` to `pb_public/cms/`, the contents of `pb_hooks/` into your `pb_hooks/`, and your config to `pb_public/cms/config.json`. When you upgrade, replace `pb_public/cms/` as a whole, so no files of the old version are left behind.
+
 ## Configuration
 
 The CMS reads `config.json` from its own folder, so copy your site's `cms.config.json` to `pb_public/cms/config.json`.
@@ -58,6 +73,12 @@ A collection's screen is a table of its records.
 - **Pages** hold `list.perPage` records (30 by default).
 
 The page, search, filter and sort are kept in the URL, so reloading and going back keep them. A localized field shows, searches and sorts the first locale in `locales`. A collection with `singleton: true` has no list: the CMS opens its one record.
+
+### Localized content
+
+For content in several languages, list the content locales in `locales` (the first is the base locale) and keep one PocketBase field per locale, named `<name>_<locale>`: `title_en`, `title_ja`. A locale with a hyphen is written in lower case with an underscore, so `zh-Hans` becomes `title_zh_hans`. Then set `"localized": true` on the base name in `fields` (`"title": { "localized": true }`) and use the base name everywhere else in the config, such as in `titleField`, `form` and `list`.
+
+The edit screen shows such a field as one input with a tab per locale. The tabs of all localized inputs switch together, and the base locale opens first. The tab of a locale whose field is still empty is marked **Empty**; rich text with nothing but empty paragraphs counts as empty, and a switch (`bool`) is never marked. Whether a locale must be filled in follows that field's `required` in PocketBase; when saving is refused, the CMS opens the locale of the first field with an error, and marks the tabs that have one. A locale in `locales` without its field in the schema is reported as a warning, and the input shows only the locales that exist. Shared values such as the slug, dates, images and the publish state are ordinary fields, so a record is published in every language at once. A slug made from a localized title uses the base locale. The language of the CMS itself is chosen separately (see the language menu) and does not change the open tab.
 
 ### Relation fields
 
@@ -112,6 +133,9 @@ A collection without `previewUrl` has no button. It needs the preview hook, `pbc
 | `collection` | The collection's name, such as `news`                     |
 | `id`         | The record's id                                           |
 | `token`      | A preview token for this one record, valid for 10 minutes |
+| `locale`     | The content locale of the open tab, such as `zh-Hans`     |
+
+`locale` is sent only when the edit screen has [localized fields](#localized-content). It is written as in `locales`, and says which language the editor wants to see; the record your page reads still holds every locale.
 
 The values are those of the saved record: changes not saved yet are not shown. More fields may be added later, so ignore the ones you don't know.
 
@@ -138,11 +162,11 @@ Relations come as ids. To show related records, read them from PocketBase's reco
 - Serve the page over HTTPS, keep the token out of URLs and logs, and don't cache or index the page (`Cache-Control: no-store`, `noindex`).
 - Show rich text only with the hooks that sanitize it installed (see below).
 
-[`examples/lantern-coffee/preview-site/server.mjs`](examples/lantern-coffee/preview-site/server.mjs) is a small page that does this, with no dependencies. The example config points `posts` and `about` at it, so with the [development PocketBase](#try-it-with-a-development-pocketbase) running, start it with `node examples/lantern-coffee/preview-site/server.mjs` and press the button. In your own site's config, change or remove those `previewUrl`s.
+[`examples/lantern-coffee/preview-site/server.mjs`](examples/lantern-coffee/preview-site/server.mjs) is a small page that does this, with no dependencies. The example config points `posts`, `events` and `about` at it, so with the [development PocketBase](#try-it-with-a-development-pocketbase) running, start it with `node examples/lantern-coffee/preview-site/server.mjs` and press the button. In your own site's config, change or remove those `previewUrl`s.
 
 ## PocketBase hooks
 
-The JavaScript hooks live in [`hooks/pb_hooks/`](hooks/pb_hooks). Copy the files you need, together with the `pbcms/` folder they load, into your PocketBase's `pb_hooks/`.
+The JavaScript hooks are in the release zip's `pb_hooks/` (in this repository, [`hooks/pb_hooks/`](hooks/pb_hooks)). Copy the files you need, together with the `pbcms/` folder they load, into your PocketBase's `pb_hooks/`.
 
 | File                     | What it does                                                                                                                                          |
 | ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -261,17 +285,50 @@ Sign in at the CMS with `editor@example.com` / `password1234`. The PocketBase da
 
 `examples/lantern-coffee/` describes a fictional coffee roaster. Each preset directory holds its migrations and a `cms.config.json`. Copy what you need into your own site.
 
-| Collection | Type        | Notes                                                                                   |
-| ---------- | ----------- | --------------------------------------------------------------------------------------- |
-| `posts`    | Article     | Title, slug, rich text body, cover image, category, stores, draft flag and publish date |
-| `stores`   | List        | Flat records with a select field and a URL                                              |
-| `about`    | Single page | One record, created by the migration; editors can update it but not create or delete it |
-| `media`    | Media       | Image file, required alt text, caption, width and height                                |
+| Collection | Type        | Notes                                                                                                                    |
+| ---------- | ----------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `posts`    | Article     | Title, slug, rich text body, cover image, category, stores, draft flag and publish date                                  |
+| `events`   | Article     | The article type in three languages (`en`, `ja`, `zh-Hans`): localized title and body, shared slug, dates and draft flag |
+| `stores`   | List        | Flat records with a select field and a URL                                                                               |
+| `about`    | Single page | One record, created by the migration; editors can update it but not create or delete it                                  |
+| `media`    | Media       | Image file, required alt text, caption, width and height                                                                 |
 
 - `examples/lantern-coffee/pb_migrations/` holds the JavaScript migrations, including `users.role`. Put them in your PocketBase's `pb_migrations/`.
 - `examples/lantern-coffee/cms.config.json` is the matching config. Copy it to `pb_public/cms/config.json`.
 - `examples/lantern-coffee/preview-site/` is the page the config's `previewUrl` points at (see [Draft previews on your site](#draft-previews-on-your-site)).
 - Every collection has `created` and `updated` (autodate) fields. Collections made by migrations don't get them automatically.
+
+## Releases
+
+The CMS, the JavaScript hooks and the Go package share one version, following [Semantic Versioning](https://semver.org). While the major version is 0, a minor release may break compatibility and a patch release does not; read the release notes before upgrading.
+
+| What             | Name for version 0.1.0                                    |
+| ---------------- | --------------------------------------------------------- |
+| Git tag          | `v0.1.0` (`go get …/pbcms@v0.1.0` uses it too)            |
+| Docker image     | `ghcr.io/kamodigi/pocketbase-cms:0.1.0` (no `latest` tag) |
+| Zip on a release | `pocketbase-cms_0.1.0.zip`                                |
+
+The tag is the only place the version is written (`version` in `package.json` stays `0.0.0`). To publish a release, tag a commit on `main` and push the tag:
+
+```sh
+git fetch origin
+git tag -a v0.1.0 -m v0.1.0 origin/main
+git push origin v0.1.0
+```
+
+The [release workflow](.github/workflows/release.yml) runs all of CI, then pushes the image (`linux/amd64` and `linux/arm64`) and creates the GitHub release with the zip. A tag with a suffix, such as `v0.1.0-rc.1`, becomes a pre-release. Never move or reuse a published tag: Go's module proxy keeps the first content it saw. Version 2 needs a `/v2` module path in `go.mod` first, so the packaging script refuses it until then.
+
+GHCR creates a new package as private. After the first release, a maintainer has to make it public once, in the package's settings on GitHub.
+
+To try the packaging locally (needs `zip`; the second check needs Docker):
+
+```sh
+pnpm build
+release/package.sh v0.0.0-dev   # release-out/pocketbase-cms_0.0.0-dev.zip
+unzip -q release-out/pocketbase-cms_0.0.0-dev.zip -d release-out/files
+docker build -f release/Dockerfile -t pocketbase-cms:check release-out/files
+release/verify-image.sh pocketbase-cms:check build
+```
 
 ## License
 

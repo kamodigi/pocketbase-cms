@@ -11,14 +11,14 @@
 
 	import { openPreview, type PreviewTarget } from './open-preview'
 
-	let { collection, id, url }: PreviewTarget = $props()
+	let { collection, id, locale, url }: PreviewTarget = $props()
 
 	let isOpening = $state(false)
 
 	async function open() {
 		isOpening = true
 		try {
-			const result = await openPreview(pb, { collection, id, url })
+			const result = await openPreview(pb, { collection, id, locale, url })
 			if (result === 'blocked') toast.error(m.preview_error_blocked())
 		} catch (error) {
 			if (!(error instanceof ClientResponseError)) throw error

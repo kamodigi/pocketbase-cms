@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import type { CmsConfig, SchemaCollection } from '#lib/config/index.js'
 
-import { buildFormModel, inputKind } from './model'
+import { buildFormModel, formEntries, inputKind } from './model'
 
 const posts: SchemaCollection = {
 	fields: [
@@ -102,14 +102,60 @@ describe('buildFormModel', () => {
 			['ja', 'en'],
 		)
 
-		expect(result.main.map(field => [field.name, field.label])).toEqual([
-			['title_ja', 'Title (ja)'],
-			['title_en', 'Title (en)'],
-			['slug', 'slug'],
+		expect(result.main.map(field => [field.name, field.label, field.localized])).toEqual([
+			['title_ja', 'Title', { base: 'title', locale: 'ja' }],
+			['title_en', 'Title', { base: 'title', locale: 'en' }],
+			['slug', 'slug', undefined],
 		])
 		// The slug comes from the base locale.
 		expect(result.main[2].slugFrom).toBe('title_ja')
 		expect(result.titleField).toBe('title_ja')
+	})
+
+	it('keeps the locales of a localized field together when the form does not place it', () => {
+		const schema: SchemaCollection = {
+			fields: [
+				{ name: 'title_en', type: 'text' },
+				{ name: 'body_en', type: 'editor' },
+				{ name: 'title_zh_hans', type: 'text' },
+				{ name: 'body_zh_hans', type: 'editor' },
+				{ name: 'title_ja', type: 'text' },
+			],
+			name: 'pages',
+		}
+		const result = model({ fields: { body: { localized: true }, title: { localized: true } } }, schema, [
+			'ja',
+			'en',
+			'zh-Hans',
+		])
+
+		expect(names(result.main)).toEqual(['title_ja', 'title_en', 'title_zh_hans', 'body_en', 'body_zh_hans'])
+		expect(result.main[2].localized).toEqual({ base: 'title', locale: 'zh-Hans' })
+	})
+})
+
+describe('formEntries', () => {
+	it('puts the locales of a localized field in one entry, where its first locale is', () => {
+		const schema: SchemaCollection = {
+			fields: [
+				{ name: 'title_ja', type: 'text' },
+				{ name: 'slug', type: 'text' },
+				{ name: 'title_en', type: 'text' },
+			],
+			name: 'pages',
+		}
+		const result = model(
+			{ fields: { title: { label: 'Title', localized: true } }, form: { main: ['slug', 'title_en', 'title_ja'] } },
+			schema,
+			['ja', 'en'],
+		)
+
+		const entries = formEntries(result.main)
+		expect(
+			entries.map(entry =>
+				entry.kind === 'field' ? entry.field.name : [entry.base, entry.label, names(entry.fields)],
+			),
+		).toEqual(['slug', ['title', 'Title', ['title_en', 'title_ja']]])
 	})
 })
 

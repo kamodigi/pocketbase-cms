@@ -18,6 +18,21 @@
 - 入力欄はコレクションのスキーマから作ります。アプリの隣に置く `cms.config.json` では、表示名・並び順・一覧の列などの見せ方だけを指定します。
 - 小さな PocketBase のフック（JavaScript の `pb_hooks` または Go のパッケージ）が、編集者へのスキーマの公開、保存時のリッチテキストの無害化、内容が変わったときのサイトへの通知を担います。
 
+## 導入
+
+[リリース](https://github.com/kamodigi/pocketbase-cms/releases)は2つの形で配ります。以下の `0.1.0` は使うバージョンに置き換えてください。
+
+**Docker イメージ。** `ghcr.io/kamodigi/pocketbase-cms` の `/dist` に、ビルド済みの CMS が入っています。イメージは起動せず、PocketBase のイメージからファイルを取り出して使います。
+
+```dockerfile
+COPY --from=ghcr.io/kamodigi/pocketbase-cms:0.1.0 /dist /pb/pb_public/cms
+COPY cms.config.json /pb/pb_public/cms/config.json
+```
+
+イメージに入っているのは CMS だけです。[PocketBase のフック](#pocketbase-のフック)は同じバージョンの zip から取るか、Go パッケージを使います。
+
+**zip。** リリースに添付する `pocketbase-cms_0.1.0.zip` には、`cms/`（ビルド済みの CMS）、`pb_hooks/`（JavaScript のフック）、ライセンスが入っています。`cms/` を `pb_public/cms/` に、`pb_hooks/` の中身を自分の `pb_hooks/` に、設定ファイルを `pb_public/cms/config.json` にコピーします。更新するときは、古いバージョンのファイルが残らないように `pb_public/cms/` を丸ごと入れ替えてください。
+
 ## 設定ファイル
 
 CMS は自分と同じフォルダの `config.json` を読み込みます。サイトの `cms.config.json` を `pb_public/cms/config.json` にコピーしてください。
@@ -58,6 +73,12 @@ PocketBase のスキーマに無いコレクションや項目を設定に書い
 - **ページ**は `list.perPage` 件ごとです（指定が無ければ30件）。
 
 ページ・検索・絞り込み・並び順は URL に残るので、再読み込みや「戻る」をしても保たれます。言語ごとの項目は、`locales` の最初の言語の値を表示・検索・並べ替えに使います。`singleton: true` のコレクションには一覧が無く、1件だけのレコードを直接開きます。
+
+### 記事の中身の多言語化
+
+記事を複数の言語で書くときは、`locales` に記事の言語を並べ（先頭が基本の言語）、PocketBase には言語ごとに `<基本名>_<言語コード>` の項目を作ります（`title_en`、`title_ja`）。ハイフン入りの言語コードは小文字とアンダースコアにするので、`zh-Hans` は `title_zh_hans` になります。そのうえで `fields` の基本名に `"localized": true` を付け（`"title": { "localized": true }`）、`titleField`・`form`・`list` など設定のほかの場所でも基本名を使います。
+
+編集画面では、こうした項目を言語のタブ付きの1つの入力欄として表示します。すべての多言語の入力欄のタブは一緒に切り替わり、最初は基本の言語が開きます。まだ入力していない言語のタブには **未入力** の印が付きます。空の段落だけのリッチテキストは未入力として扱い、オン・オフの項目（`bool`）には印を付けません。どの言語を必須にするかは PocketBase の各項目の `required` に従います。保存できなかったときは、最初にエラーがある項目の言語のタブを開き、エラーのあるタブに印を付けます。`locales` にあってスキーマに項目が無い言語は警告として表示し、入力欄にはある言語だけを出します。スラッグ・日付・画像・公開状態は言語で共通の普通の項目なので、公開はすべての言語でまとめて行います。多言語のタイトルから作るスラッグは基本の言語の値を使います。管理画面そのものの言語は別に選び（言語のメニュー）、開いているタブとは連動しません。
 
 ### relation 型の項目
 
@@ -112,6 +133,9 @@ PocketBase のスキーマに無いコレクションや項目を設定に書い
 | `collection` | コレクション名（`news` など）                                  |
 | `id`         | レコードの ID                                                  |
 | `token`      | このレコード 1 件だけに使えるプレビュー用トークン。10 分間有効 |
+| `locale`     | 開いているタブの言語（`zh-Hans` など）                         |
+
+`locale` は、編集画面に[多言語の項目](#記事の中身の多言語化)があるときだけ送ります。値は `locales` に書いたとおりで、編集者が見たい言語を表します。ページが読み出すレコードには、すべての言語の値が入っています。
 
 プレビューに出るのは保存済みのレコードです。保存していない変更は反映されません。項目は今後増えることがあるので、知らない項目は無視してください。
 
@@ -138,11 +162,11 @@ Authorization: Bearer <token>
 - ページは HTTPS で配信し、トークンを URL やログに残さず、ページをキャッシュ・インデックスさせないでください（`Cache-Control: no-store`、`noindex`）。
 - リッチテキストは、無害化するフック（後述）を入れた状態でだけ表示してください。
 
-[`examples/lantern-coffee/preview-site/server.mjs`](examples/lantern-coffee/preview-site/server.mjs) は、これを行う依存パッケージなしの小さなページです。サンプルの設定では `posts` と `about` がこのページを指しています。[開発用の PocketBase](#開発用の-pocketbase-で試す) を起動した状態で `node examples/lantern-coffee/preview-site/server.mjs` を実行し、ボタンを押してください。自分のサイトの設定では、この `previewUrl` を書き換えるか消してください。
+[`examples/lantern-coffee/preview-site/server.mjs`](examples/lantern-coffee/preview-site/server.mjs) は、これを行う依存パッケージなしの小さなページです。サンプルの設定では `posts`・`events`・`about` がこのページを指しています。[開発用の PocketBase](#開発用の-pocketbase-で試す) を起動した状態で `node examples/lantern-coffee/preview-site/server.mjs` を実行し、ボタンを押してください。自分のサイトの設定では、この `previewUrl` を書き換えるか消してください。
 
 ## PocketBase のフック
 
-JavaScript のフックは [`hooks/pb_hooks/`](hooks/pb_hooks) にあります。使うファイルを、読み込む `pbcms/` フォルダと一緒に、自分の PocketBase の `pb_hooks/` にコピーします。
+JavaScript のフックは、リリースの zip の `pb_hooks/`（このリポジトリでは [`hooks/pb_hooks/`](hooks/pb_hooks)）にあります。使うファイルを、読み込む `pbcms/` フォルダと一緒に、自分の PocketBase の `pb_hooks/` にコピーします。
 
 | ファイル                 | 役割                                                                                                                                         |
 | ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -261,17 +285,50 @@ CMS には `editor@example.com` / `password1234` でログインします。Pock
 
 `examples/lantern-coffee/` は、架空のコーヒー焙煎所のサイトです。各プリセットのディレクトリに、マイグレーションと `cms.config.json` があります。必要なものを自分のサイトにコピーして使います。
 
-| コレクション | 型           | 内容                                                                                  |
-| ------------ | ------------ | ------------------------------------------------------------------------------------- |
-| `posts`      | 記事型       | タイトル、スラッグ、リッチテキストの本文、カバー画像、カテゴリ、店舗、下書きと公開日  |
-| `stores`     | 一覧型       | 選択項目と URL を持つ、並列のレコード                                                 |
-| `about`      | 単一ページ型 | レコードは1件だけ。マイグレーションで作り、編集者は更新だけできる（作成・削除は不可） |
-| `media`      | メディア     | 画像ファイル、必須の代替テキスト、キャプション、幅と高さ                              |
+| コレクション | 型           | 内容                                                                                               |
+| ------------ | ------------ | -------------------------------------------------------------------------------------------------- |
+| `posts`      | 記事型       | タイトル、スラッグ、リッチテキストの本文、カバー画像、カテゴリ、店舗、下書きと公開日               |
+| `events`     | 記事型       | 3つの言語（`en`・`ja`・`zh-Hans`）の記事型。タイトルと本文は言語ごと、スラッグ・日付・下書きは共通 |
+| `stores`     | 一覧型       | 選択項目と URL を持つ、並列のレコード                                                              |
+| `about`      | 単一ページ型 | レコードは1件だけ。マイグレーションで作り、編集者は更新だけできる（作成・削除は不可）              |
+| `media`      | メディア     | 画像ファイル、必須の代替テキスト、キャプション、幅と高さ                                           |
 
 - `examples/lantern-coffee/pb_migrations/` に JavaScript のマイグレーションがあります（`users.role` も含みます）。自分の PocketBase の `pb_migrations/` に置きます。
 - `examples/lantern-coffee/cms.config.json` が対応する設定ファイルです。`pb_public/cms/config.json` にコピーします。
 - `examples/lantern-coffee/preview-site/` は、設定の `previewUrl` が指すページです（[サイトでの下書きのプレビュー](#サイトでの下書きのプレビュー)を参照）。
 - どのコレクションにも `created` と `updated`（autodate 型）があります。マイグレーションで作ったコレクションには自動では付かないためです。
+
+## リリース
+
+CMS、JavaScript のフック、Go パッケージのバージョンは1つで、[セマンティックバージョニング](https://semver.org/lang/ja/)に従います。メジャーバージョンが 0 の間は、マイナーリリースで互換性が壊れることがあります（パッチリリースでは壊しません）。更新の前にリリースノートを読んでください。
+
+| 対象            | バージョン 0.1.0 の名前                                        |
+| --------------- | -------------------------------------------------------------- |
+| Git のタグ      | `v0.1.0`（`go get …/pbcms@v0.1.0` もこれを使う）               |
+| Docker イメージ | `ghcr.io/kamodigi/pocketbase-cms:0.1.0`（`latest` は付けない） |
+| リリースの zip  | `pocketbase-cms_0.1.0.zip`                                     |
+
+バージョンを書く場所はタグだけです（`package.json` の `version` は `0.0.0` のままです）。リリースするには、`main` のコミットにタグを打って push します。
+
+```sh
+git fetch origin
+git tag -a v0.1.0 -m v0.1.0 origin/main
+git push origin v0.1.0
+```
+
+[リリースのワークフロー](.github/workflows/release.yml)は、CI をすべて実行してから、イメージ（`linux/amd64` と `linux/arm64`）を push し、zip を添付した GitHub のリリースを作ります。`v0.1.0-rc.1` のように接尾辞の付いたタグはプレリリースになります。公開したタグは動かしたり使い回したりしないでください。Go のモジュールプロキシは、最初に取得した中身を保持します。バージョン 2 には先に `go.mod` のモジュールのパスに `/v2` が必要なので、それまでパッケージ化のスクリプトは受け付けません。
+
+GHCR は新しいパッケージを非公開で作ります。最初のリリースの後に一度だけ、メンテナーが GitHub のパッケージの設定で公開に変えてください。
+
+パッケージ化は手元でも試せます（`zip` が必要です。後半の確認には Docker が必要です）。
+
+```sh
+pnpm build
+release/package.sh v0.0.0-dev   # release-out/pocketbase-cms_0.0.0-dev.zip
+unzip -q release-out/pocketbase-cms_0.0.0-dev.zip -d release-out/files
+docker build -f release/Dockerfile -t pocketbase-cms:check release-out/files
+release/verify-image.sh pocketbase-cms:check build
+```
 
 ## ライセンス
 

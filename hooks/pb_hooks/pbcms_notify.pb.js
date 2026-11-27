@@ -1,7 +1,7 @@
 /// <reference path="../pb_data/types.d.ts" />
 // pocketbase-cms: tells the site when a record of a collection the CMS manages is created, updated or
 // deleted, through the CMS, the API, the dashboard or app.save(), so it can rebuild its pages. Needs
-// pbcms/notify.cjs and pbcms/config.cjs next to this file.
+// pbcms/notify.cjs and pbcms/cms.cjs next to this file.
 //
 // Set both environment variables of PocketBase; without PBCMS_NOTIFY_URL nothing happens:
 //

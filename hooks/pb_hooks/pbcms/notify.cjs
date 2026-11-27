@@ -99,8 +99,8 @@ function isNotified(e) {
 	if (!$os.getenv('PBCMS_NOTIFY_URL')) return false
 	const collection = e.record.collection()
 	if (collection.system) return false
-	const { managedCollectionNames } = require(`${__hooks}/pbcms/config.cjs`)
-	if (!managedCollectionNames().includes(collection.name)) return false
+	const { managedCollectionNames } = require(`${__hooks}/pbcms/cms.cjs`)
+	if (!managedCollectionNames(e.app).has(collection.name)) return false
 	if (!$os.getenv('PBCMS_NOTIFY_SECRET')) throw new Error('PBCMS_NOTIFY_SECRET is not set')
 	return true
 }

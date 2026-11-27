@@ -1,13 +1,19 @@
 // Starts a throwaway PocketBase for the integration and E2E tests: the official binary at the
 // version in compose.yaml, the example presets, the dev seed and the hooks in hooks/pb_hooks/, and
 // a fresh data directory.
+//
+// With PBCMS_POCKETBASE=go, it is instead a PocketBase built with Go and the pbcms package
+// (tests/gopocketbase/), and the JavaScript hooks that the package replaces are left out, so the
+// same tests check both.
 import { unzipSync } from 'fflate'
-import { spawn } from 'node:child_process'
+import { execFile, spawn } from 'node:child_process'
+import { createHash } from 'node:crypto'
 import { existsSync } from 'node:fs'
 import { chmod, cp, mkdir, mkdtemp, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import { createServer } from 'node:net'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { promisify } from 'node:util'
 
 const root = path.resolve(import.meta.dirname, '..')
 
@@ -28,6 +34,13 @@ const releaseArchs = new Map<string, string>([
 	['arm64', 'arm64'],
 	['x64', 'amd64'],
 ])
+
+/**
+The JavaScript hooks that the Go package does in its place.
+*/
+const hooksInGo = new Set(['pbcms_schema.pb.js'])
+
+const isGoBuild = process.env.PBCMS_POCKETBASE === 'go'
 
 export interface PocketBaseServer {
 	stop: () => Promise<void>
@@ -54,7 +67,7 @@ export interface StartOptions {
 }
 
 export async function startPocketBase(options: StartOptions = {}): Promise<PocketBaseServer> {
-	const binary = await ensureBinary(await readVersion())
+	const binary = isGoBuild ? await buildGoBinary() : await ensureBinary(await readVersion())
 	const port = options.port ?? (await freePort())
 	// A server left over from an earlier run would answer the health check in place of this one.
 	if (options.port !== undefined && !(await isPortFree(port))) {
@@ -70,7 +83,10 @@ export async function startPocketBase(options: StartOptions = {}): Promise<Pocke
 	for (const source of ['examples/lantern-coffee/pb_migrations', 'dev/pb_migrations']) {
 		await cp(path.join(root, source), migrationsDirectory, { recursive: true })
 	}
-	await cp(path.join(root, 'hooks/pb_hooks'), hooksDirectory, { recursive: true })
+	await cp(path.join(root, 'hooks/pb_hooks'), hooksDirectory, {
+		filter: source => !isGoBuild || !hooksInGo.has(path.basename(source)),
+		recursive: true,
+	})
 	const hookFiles = Object.entries(options.hooks ?? {})
 	for (const [target, source] of hookFiles) {
 		await cp(path.resolve(root, source), path.join(hooksDirectory, target))
@@ -130,6 +146,56 @@ export async function startPocketBase(options: StartOptions = {}): Promise<Pocke
 }
 
 /**
+Built once per process. Go caches the build, so only the first run after a change takes long.
+*/
+const goBuild: { binary?: Promise<string> } = {}
+async function buildGoBinary(): Promise<string> {
+	goBuild.binary ??= (async () => {
+		const name = process.platform === 'win32' ? 'pocketbase.exe' : 'pocketbase'
+		const binary = path.join(root, 'node_modules/.cache/pocketbase/go', name)
+		// Other test processes may be starting the binary: build under a temporary name, then replace it.
+		const partial = `${binary}.${process.pid}.partial`
+		await promisify(execFile)('go', ['build', '-o', partial, './tests/gopocketbase'], {
+			cwd: root,
+			// PocketBase's SQLite driver is pure Go.
+			env: { ...process.env, CGO_ENABLED: '0' },
+		})
+		await rename(partial, binary)
+		return binary
+	})()
+	return goBuild.binary
+}
+
+/**
+PocketBase's releases are at ganigeorgiev.com since v0.41. A file's URL holds the id of the release
+record, so look it up by tag first, with the same filter as `pocketbase update`. The file is checked
+against the release's checksums.txt.
+*/
+async function downloadRelease(version: string, file: string): Promise<Uint8Array> {
+	const base = 'https://ganigeorgiev.com'
+	const filter = `channel.repository.project.name="pocketbase" && channel.repository.name="pocketbase" && channel.name="default" && draft=false && tag="v${version}"`
+	const query = new URLSearchParams({ fields: 'id', filter, perPage: '1', skipTotal: '1' })
+	const release = await fetchOk(`${base}/api/collections/releases/records?${query}`)
+	const { items } = (await release.json()) as { items: { id: string }[] }
+	if (items.length === 0) throw new Error(`No PocketBase v${version} release at ${base}`)
+	const files = `${base}/api/files/releases/${items[0].id}`
+
+	const checksumsResponse = await fetchOk(`${files}/checksums.txt`)
+	const checksums = await checksumsResponse.text()
+	const expected = checksums
+		.split('\n')
+		.map(line => line.trim().split(/\s+/))
+		.find(([, name]) => name === file)?.[0]
+	if (!expected) throw new Error(`checksums.txt of PocketBase v${version} has no ${file}`)
+
+	const fileResponse = await fetchOk(`${files}/${file}`)
+	const content = new Uint8Array(await fileResponse.arrayBuffer())
+	const actual = createHash('sha256').update(content).digest('hex')
+	if (actual !== expected) throw new Error(`${file}: SHA-256 is ${actual}, checksums.txt says ${expected}`)
+	return content
+}
+
+/**
 The binary is cached per version and platform in node_modules/.cache, so it is downloaded once.
 */
 async function ensureBinary(version: string): Promise<string> {
@@ -142,12 +208,10 @@ async function ensureBinary(version: string): Promise<string> {
 	const binary = path.join(directory, name)
 	if (existsSync(binary)) return binary
 
-	const url = `https://github.com/pocketbase/pocketbase/releases/download/v${version}/pocketbase_${version}_${platform}_${arch}.zip`
-	const response = await fetch(url)
-	if (!response.ok) throw new Error(`Downloading ${url} failed: ${response.status}`)
-	const files = unzipSync(new Uint8Array(await response.arrayBuffer()), { filter: file => file.name === name })
+	const zip = await downloadRelease(version, `pocketbase_${version}_${platform}_${arch}.zip`)
+	const files = unzipSync(zip, { filter: file => file.name === name })
 	const content = files[name] as Uint8Array | undefined
-	if (!content) throw new Error(`${url} has no ${name}`)
+	if (!content) throw new Error(`The PocketBase ${version} release has no ${name}`)
 
 	await mkdir(directory, { recursive: true })
 	// Write under a temporary name first, so an interrupted download never leaves a broken binary.
@@ -156,6 +220,12 @@ async function ensureBinary(version: string): Promise<string> {
 	await chmod(partial, 0o755)
 	await rename(partial, binary)
 	return binary
+}
+
+async function fetchOk(url: string): Promise<Response> {
+	const response = await fetch(url)
+	if (!response.ok) throw new Error(`Downloading ${url} failed: ${response.status}`)
+	return response
 }
 
 async function freePort(): Promise<number> {

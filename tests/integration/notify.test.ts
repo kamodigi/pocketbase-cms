@@ -279,7 +279,7 @@ describe('notifications to the site', () => {
 			env: { PBCMS_NOTIFY_SECRET: secret, PBCMS_NOTIFY_URL: 'receiver' },
 			name: 'without a readable CMS config',
 			public: {},
-			reason: 'config.json',
+			reason: 'The CMS config could not be read',
 		},
 		{
 			env: { PBCMS_NOTIFY_SECRET: secret, PBCMS_NOTIFY_URL: 'http://127.0.0.1:1/closed' },

@@ -47,6 +47,18 @@ Only `users` accounts with `role = "editor"` can sign in; anyone else is signed 
 
 The sidebar lists the collections in `collections`, grouped by `nav`. Collections that `nav` does not list are appended to its last group; without `nav` they form one group in config order. After sign-in the CMS opens the first collection in the sidebar. `icon` takes one of these Lucide icon names, and any other name shows `file-text`: `award`, `bell`, `book-open`, `box`, `briefcase`, `building`, `calendar`, `camera`, `clipboard-list`, `coffee`, `file`, `file-text`, `folder`, `gift`, `globe`, `graduation-cap`, `handshake`, `heart`, `house`, `image`, `images`, `info`, `layers`, `layout-grid`, `link`, `list`, `mail`, `map`, `map-pin`, `megaphone`, `message-square`, `newspaper`, `package`, `pen-line`, `phone`, `quote`, `rss`, `settings`, `shopping-bag`, `star`, `store`, `tag`, `ticket`, `trophy`, `user`, `users`, `utensils`, `video`.
 
+### List screens
+
+A collection's screen is a table of its records.
+
+- **Columns** are `list.columns`, with the labels from `fields`. Without it, the list shows the title field (`titleField`, or the first text field), the publish state if the collection has `status`, and `updated` if it has that field. The title links to the record. Images are shown as thumbnails and related records by name.
+- **Search** matches the fields in `list.search` (by default the title field) for the typed text.
+- **Filter**: with `status`, the list can be narrowed to published, scheduled (only with `publishedAtField`) or draft records.
+- **Sort**: the order is `list.sort`, or else newest `updated` first. Selecting the header of a date column sorts by that date, newest first, and selecting it again reverses the order.
+- **Pages** hold `list.perPage` records (30 by default).
+
+The page, search, filter and sort are kept in the URL, so reloading and going back keep them. A localized field shows, searches and sorts the first locale in `locales`. A collection with `singleton: true` has no list: the CMS opens its one record.
+
 ## PocketBase hooks
 
 The JavaScript hooks live in [`hooks/pb_hooks/`](hooks/pb_hooks). Copy the files you need, together with the `pbcms/` folder they load, into your PocketBase's `pb_hooks/`.

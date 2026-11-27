@@ -47,6 +47,18 @@ PocketBase のスキーマに無いコレクションや項目を設定に書い
 
 サイドバーには `collections` のコレクションを `nav` のグループ分けで並べます。`nav` に書いていないコレクションは最後のグループの末尾に足します。`nav` が無いときは、設定の順に1つのグループにまとめます。ログインすると、サイドバーの最初のコレクションを開きます。`icon` には次の Lucide のアイコン名を使えます。それ以外の名前は `file-text` になります：`award`、`bell`、`book-open`、`box`、`briefcase`、`building`、`calendar`、`camera`、`clipboard-list`、`coffee`、`file`、`file-text`、`folder`、`gift`、`globe`、`graduation-cap`、`handshake`、`heart`、`house`、`image`、`images`、`info`、`layers`、`layout-grid`、`link`、`list`、`mail`、`map`、`map-pin`、`megaphone`、`message-square`、`newspaper`、`package`、`pen-line`、`phone`、`quote`、`rss`、`settings`、`shopping-bag`、`star`、`store`、`tag`、`ticket`、`trophy`、`user`、`users`、`utensils`、`video`。
 
+### 一覧画面
+
+コレクションの画面は、レコードの表です。
+
+- **列**は `list.columns` で、見出しには `fields` の表示名を使います。指定が無いときは、タイトルの項目（`titleField`、無ければ最初の text 型の項目）、`status` があれば公開状態、`updated` の項目があればそれを表示します。タイトルはレコードへのリンクです。画像はサムネイルで、関連するレコードは名前で表示します。
+- **検索**は、`list.search` の項目（指定が無ければタイトルの項目）に、入力した文字列を含むレコードを探します。
+- **絞り込み**：`status` があるコレクションは、公開・予約公開（`publishedAtField` があるときだけ）・下書きで絞り込めます。
+- **並び順**は `list.sort`、指定が無ければ `updated` の新しい順です。日付の列の見出しを選ぶとその日付の新しい順に、もう一度選ぶと逆順に並べ替えます。
+- **ページ**は `list.perPage` 件ごとです（指定が無ければ30件）。
+
+ページ・検索・絞り込み・並び順は URL に残るので、再読み込みや「戻る」をしても保たれます。言語ごとの項目は、`locales` の最初の言語の値を表示・検索・並べ替えに使います。`singleton: true` のコレクションには一覧が無く、1件だけのレコードを直接開きます。
+
 ## PocketBase のフック
 
 JavaScript のフックは [`hooks/pb_hooks/`](hooks/pb_hooks) にあります。使うファイルを、読み込む `pbcms/` フォルダと一緒に、自分の PocketBase の `pb_hooks/` にコピーします。

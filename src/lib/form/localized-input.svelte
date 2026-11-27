@@ -6,6 +6,9 @@
 
 	import type { FormField } from './model'
 	import type { FieldErrors } from './validate'
+	import type { FormValues } from './values'
+
+	import { isBlank } from './blank'
 
 	interface Props {
 		/**
@@ -24,9 +27,13 @@
 		input: Snippet<[FormField]>
 		label: string
 		uiLocale: string
+		/**
+		The form's values, which say which locales are still empty.
+		*/
+		values: FormValues
 	}
 
-	let { active = $bindable(), errors, fields, input, label, uiLocale }: Props = $props()
+	let { active = $bindable(), errors, fields, input, label, uiLocale, values }: Props = $props()
 
 	const languageNames = $derived.by(() => {
 		try {
@@ -62,6 +69,9 @@
 			{@const locale = localeOf(field)}
 			<Tabs.Trigger lang={locale} value={locale}>
 				{languageName(locale)}
+				{#if isBlank(field, values[field.name])}
+					<span class="rounded-sm border border-dashed px-1 text-xs font-normal">{m.form_locale_empty()}</span>
+				{/if}
 				{#if errors[field.name] !== undefined}
 					<span class="bg-destructive size-1.5 rounded-full" aria-hidden="true"></span>
 					<span class="sr-only">({m.form_locale_has_error()})</span>

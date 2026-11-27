@@ -45,6 +45,7 @@
 			"label": "Events",
 			"icon": "calendar",
 			"titleField": "title",
+			"previewUrl": "http://127.0.0.1:3001/preview",
 			"status": { "draftField": "draft", "publishedAtField": "published_at" },
 			"list": {
 				"columns": ["title", "starts_at", "$status", "updated"],

@@ -77,6 +77,9 @@
 	let isDeleteOpen = $state(false)
 	// The content locale whose tab is open in every localized input; the base locale first.
 	let contentLocale = $state(untrack(() => config.locales?.[0] ?? ''))
+	// The locales that have a tab; the preview is asked for the open one (decision 36).
+	const formLocales = fields.flatMap(field => field.localized?.locale ?? [])
+	const previewLocale = $derived(formLocales.includes(contentLocale) ? contentLocale : formLocales[0])
 	// A slug follows its source field until the user writes a slug of their own.
 	const slugFields = fields.filter(field => field.kind === 'slug' && field.slugFrom !== undefined)
 	let ownSlugs = $state(Object.fromEntries(slugFields.map(field => [field.name, values[field.name] !== ''])))
@@ -308,6 +311,7 @@
 				input={fieldInput}
 				label={entry.label}
 				{uiLocale}
+				{values}
 				bind:active={contentLocale}
 			/>
 		{/if}
@@ -369,7 +373,7 @@
 			{isSaving ? m.record_saving() : saved ? m.record_save() : m.record_create()}
 		</Button>
 		{#if saved && previewUrl !== undefined}
-			<PreviewButton {collection} id={saved.id} url={previewUrl} />
+			<PreviewButton {collection} id={saved.id} locale={previewLocale} url={previewUrl} />
 			{#if hasUnsavedChanges}
 				<p class="text-muted-foreground text-sm" role="status">{m.preview_unsaved()}</p>
 			{/if}

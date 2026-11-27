@@ -2,6 +2,18 @@ import { expect, test } from '@playwright/test'
 
 import { devAccounts, type PocketBaseServer, startPocketBase } from '../pocketbase'
 
+// index.html names its files relative to itself, so these only load once PocketBase has redirected to
+// the address with the trailing slash. The browser keeps the part after # across the redirect.
+for (const path of ['/cms', '/cms#/password-reset']) {
+	test(`${path}, without the trailing slash, shows the CMS`, async ({ baseURL, page }) => {
+		await page.goto(path)
+
+		await expect(page.getByText('Lantern Coffee')).toBeVisible()
+		const route = path.includes('#') ? '#/password-reset' : '#/login'
+		await expect(page).toHaveURL(`${baseURL}/cms/${route}`)
+	})
+}
+
 // The same build as the other tests serve in pb_public/cms/, put in other folders of pb_public.
 for (const folder of ['edit', 'sites/lantern-editor']) {
 	test.describe(`the build in pb_public/${folder}/`, () => {
@@ -15,6 +27,13 @@ for (const folder of ['edit', 'sites/lantern-editor']) {
 			})
 		})
 		test.afterAll(() => server.stop())
+
+		test('shows the CMS when a deep link has no trailing slash', async ({ page }) => {
+			await page.goto(`${server.url}/${folder}#/password-reset`)
+
+			await expect(page.getByText('Lantern Coffee')).toBeVisible()
+			await expect(page).toHaveURL(`${server.url}/${folder}/#/password-reset`)
+		})
 
 		test('loads its files and config from that folder, and keeps a deep link on reload', async ({ page }) => {
 			const files: string[] = []

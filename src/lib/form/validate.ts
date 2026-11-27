@@ -53,6 +53,13 @@ export function validateField(form: FormField, value: FormValue, uiLocale: strin
 		case 'number': {
 			return numberError(form, value)
 		}
+		case 'relations': {
+			const count = Array.isArray(value) ? value.length : 1
+			const max = field.maxSelect ?? 1
+			if (count > max) return m.form_error_max_select({ max })
+			const min = field.minSelect ?? 0
+			return count < min ? m.form_error_min_select({ min }) : undefined
+		}
 		case 'slug':
 		case 'text':
 		case 'textarea': {

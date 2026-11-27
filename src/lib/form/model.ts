@@ -7,6 +7,7 @@ import {
 	type SchemaField,
 } from '#lib/config/index.js'
 import { titleFieldName } from '#lib/list/model.js'
+import { type RelationTarget, relationTarget } from '#lib/relation/target.js'
 import { m } from '#paraglide/messages.js'
 
 export interface FormField {
@@ -28,6 +29,10 @@ export interface FormField {
 	*/
 	readonly: boolean
 	/**
+	For relations: where the records to choose from are.
+	*/
+	relation?: RelationTarget
+	/**
 	For slugs: the PocketBase field a slug is suggested from.
 	*/
 	slugFrom?: string
@@ -47,7 +52,7 @@ export interface FormModel {
 }
 
 /**
-The input a field gets. `pending` is a type whose input comes in a later version (relation, file);
+The input a field gets. `pending` is a type whose input comes in a later version (file);
 its value is shown nowhere and never sent.
 */
 export type InputKind =
@@ -57,6 +62,8 @@ export type InputKind =
 	| 'datetime'
 	| 'number'
 	| 'pending'
+	| 'relation'
+	| 'relations'
 	| 'select'
 	| 'slug'
 	| 'text'
@@ -90,9 +97,15 @@ const timestampLabels = new Map([
 ])
 
 /**
-The edit form of one collection, from the reconciled config and the schema.
+The edit form of one collection, from the reconciled config and the schema. `collections` is the whole
+schema, where the targets of relation fields are looked up.
 */
-export function buildFormModel(config: CmsConfig, schema: SchemaCollection, uiLocale: string): FormModel {
+export function buildFormModel(
+	config: CmsConfig,
+	schema: SchemaCollection,
+	uiLocale: string,
+	collections: SchemaCollection[] = [],
+): FormModel {
 	const collection = config.collections[schema.name] ?? {}
 	const fieldConfigs = collection.fields ?? {}
 	const fields = new Map(schema.fields.map(field => [field.name, field]))
@@ -145,6 +158,8 @@ export function buildFormModel(config: CmsConfig, schema: SchemaCollection, uiLo
 					value,
 				})),
 				readonly: kind === 'autodate' || Boolean(fieldConfig?.readonly),
+				relation:
+					field.type === 'relation' ? relationTarget(config, field, fieldConfig, collections, uiLocale) : undefined,
 				slugFrom: kind === 'slug' ? resolveName(fieldConfig?.slugFrom) : undefined,
 			},
 		]
@@ -189,6 +204,10 @@ export function inputKind(field: SchemaField, config: FieldConfig | undefined): 
 		case 'number': {
 			return 'number'
 		}
+		case 'relation': {
+			// `widget: "media"` gets the same picker until the image picker arrives.
+			return isMultiple(field) ? 'relations' : 'relation'
+		}
 		case 'select': {
 			// The value is a list or a single string, so the PocketBase field decides, not `widget`.
 			return isMultiple(field) ? 'checkboxes' : 'select'
@@ -207,7 +226,7 @@ export function inputKind(field: SchemaField, config: FieldConfig | undefined): 
 }
 
 /**
-Whether a select field holds a list of values.
+Whether a select or relation field holds a list of values.
 */
 export function isMultiple(field: SchemaField): boolean {
 	return (field.maxSelect ?? 1) > 1

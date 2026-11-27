@@ -6,7 +6,7 @@ import type { FormField, FormModel } from './model'
 
 /**
 What an input holds: text (also dates, as the input writes them), a number or nothing, an on/off
-switch, or a list of choices.
+switch, or a list of choices or record ids.
 */
 export type FormValue = boolean | number | string | string[] | undefined
 
@@ -80,7 +80,8 @@ export function toInputValue(field: FormField, value: unknown): FormValue {
 		case 'autodate': {
 			return typeof value === 'string' ? value : ''
 		}
-		case 'checkboxes': {
+		case 'checkboxes':
+		case 'relations': {
 			return Array.isArray(value) ? value.map(String) : typeof value === 'string' && value !== '' ? [value] : []
 		}
 		case 'date': {

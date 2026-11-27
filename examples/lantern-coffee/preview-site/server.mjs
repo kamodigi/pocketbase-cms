@@ -1,6 +1,7 @@
 // A minimal preview page for the fictional Lantern Coffee site, with no dependencies. The CMS's
-// "Preview on site" button posts `collection`, `id` and `token` here; the page reads that one draft
-// from PocketBase with the token and shows it. See "Draft previews on your site" in the README.
+// "Preview on site" button posts `collection`, `id` and `token` here, and for localized records the
+// `locale` of the open tab; the page reads that one draft from PocketBase with the token and shows it
+// in that locale. See "Draft previews on your site" in the README.
 //
 //   node examples/lantern-coffee/preview-site/server.mjs
 //
@@ -12,7 +13,9 @@ import process from 'node:process'
 import { pathToFileURL } from 'node:url'
 
 // Only what this site has pages for. Never build the API request from other values.
-const collections = new Set(['about', 'posts'])
+const collections = new Set(['about', 'events', 'posts'])
+// The site's content locales, as in cms.config.json; the first is the base locale.
+const locales = ['en', 'ja', 'zh-Hans']
 const recordId = /^[a-zA-Z0-9_-]{1,100}$/
 const maxBodyLength = 10_000
 
@@ -44,6 +47,14 @@ function escapeHtml(value = '') {
 }
 
 /**
+@param {string} name
+@param {string} locale
+*/
+function fieldName(name, locale) {
+	return `${name}_${locale.toLowerCase().replaceAll('-', '_')}`
+}
+
+/**
 @param {string} pocketbaseUrl
 @param {import('node:http').IncomingMessage} request
 @param {import('node:http').ServerResponse} response
@@ -62,7 +73,10 @@ async function handle(pocketbaseUrl, request, response) {
 	const collection = form.get('collection') ?? ''
 	const id = form.get('id') ?? ''
 	const token = form.get('token') ?? ''
-	if (!collections.has(collection) || !recordId.test(id) || !/^[\w.-]+$/.test(token)) {
+	// Absent for a record without localized fields.
+	const locale = form.get('locale') ?? locales[0]
+	const isKnown = collections.has(collection) && locales.includes(locale)
+	if (!isKnown || !recordId.test(id) || !/^[\w.-]+$/.test(token)) {
 		return send(response, 400, message('Open the preview from the CMS.'))
 	}
 
@@ -75,10 +89,14 @@ async function handle(pocketbaseUrl, request, response) {
 	if (!answer.ok) return send(response, answer.status, message('The preview could not be loaded.'))
 
 	/**
-	@type {{ body?: string, title?: string }}
+	@type {Record<string, string | undefined>}
 	*/
 	const record = await answer.json()
-	send(response, 200, `<h1>${escapeHtml(record.title)}</h1>\n<article>${record.body ?? ''}</article>`)
+	// A localized field is stored as `<name>_<locale>`; an empty translation falls back to the base.
+	const value = (/** @type {string} */ name) =>
+		record[fieldName(name, locale)] || record[fieldName(name, locales[0])] || record[name] || ''
+	const content = `<h1>${escapeHtml(value('title'))}</h1>\n<article>${value('body')}</article>`
+	send(response, 200, `<div lang="${locale}">\n${content}\n</div>`)
 }
 
 /**

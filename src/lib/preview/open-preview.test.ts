@@ -54,6 +54,16 @@ describe('openPreview', () => {
 		})
 	})
 
+	it('also posts the content locale when there is one', async () => {
+		const { tab } = openTab()
+		serve(200, { token: 'a.b.c' })
+		vi.spyOn(HTMLFormElement.prototype, 'submit').mockImplementation(() => {})
+
+		await openPreview(new PocketBase('http://pb.test'), { ...target, locale: 'zh-Hans' })
+
+		expect(tab.document.querySelector<HTMLInputElement>('input[name="locale"]')?.value).toBe('zh-Hans')
+	})
+
 	it('asks for no token when the browser blocks the tab', async () => {
 		// eslint-disable-next-line unicorn/no-null -- what window.open answers when blocked
 		vi.spyOn(globalThis, 'open').mockReturnValue(null)

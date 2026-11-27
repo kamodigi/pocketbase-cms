@@ -4,6 +4,10 @@ export interface PreviewTarget {
 	collection: string
 	id: string
 	/**
+	The content locale of the open tab; only for a record with localized fields.
+	*/
+	locale?: string
+	/**
 	The collection's `previewUrl`: the site's page that receives the form.
 	*/
 	url: string
@@ -11,12 +15,13 @@ export interface PreviewTarget {
 
 /**
 Opens a record's preview on the site in a new tab: gets a preview token for it, then sends
-`collection`, `id` and `token` to the site as a form POST, so that the token never shows in a URL.
+`collection`, `id`, `token` and, with localized fields, `locale` to the site as a form POST, so that
+the token never shows in a URL.
 Answers "blocked" when the browser did not let the tab open.
 */
 export async function openPreview(
 	client: PocketBase,
-	{ collection, id, url }: PreviewTarget,
+	{ collection, id, locale, url }: PreviewTarget,
 ): Promise<'blocked' | 'opened'> {
 	// Opened before the request: browsers only allow a new tab while they handle the click.
 	const tab = window.open('', '_blank')
@@ -35,7 +40,7 @@ export async function openPreview(
 		throw error
 	}
 	// The user closed the tab while waiting.
-	if (!tab.closed) submitForm(tab.document, url, { collection, id, token })
+	if (!tab.closed) submitForm(tab.document, url, { collection, id, token, ...(locale !== undefined && { locale }) })
 	return 'opened'
 }
 

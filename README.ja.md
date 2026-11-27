@@ -43,11 +43,12 @@ PocketBase のスキーマに無いコレクションや項目を設定に書い
 
 JavaScript のフックは [`hooks/pb_hooks/`](hooks/pb_hooks) にあります。使うファイルを、読み込む `pbcms/` フォルダと一緒に、自分の PocketBase の `pb_hooks/` にコピーします。
 
-| ファイル                 | 役割                                                                                                                               |
-| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------- |
-| `pbcms_sanitize.pb.js`   | PocketBase を通して保存するときに、`editor` 型の項目の HTML を無害化する。CMS・API・ダッシュボード・`app.save()` のどれでも効く    |
-| `pbcms_media_urls.pb.js` | API の応答で、`editor` 型の項目をもう一度無害化し、`<img data-media-id="…">` の画像を、その `media` レコードの今のファイルに向ける |
-| `pbcms_schema.pb.js`     | `GET /api/cms/schema` を追加し、ログイン済みの編集者に、CMS が扱うコレクションの定義を返す                                         |
+| ファイル                 | 役割                                                                                                                                         |
+| ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pbcms_sanitize.pb.js`   | PocketBase を通して保存するときに、`editor` 型の項目の HTML を無害化する。CMS・API・ダッシュボード・`app.save()` のどれでも効く              |
+| `pbcms_media_urls.pb.js` | API の応答で、`editor` 型の項目をもう一度無害化し、`<img data-media-id="…">` の画像を、その `media` レコードの今のファイルに向ける           |
+| `pbcms_schema.pb.js`     | `GET /api/cms/schema` を追加し、ログイン済みの編集者に、CMS が扱うコレクションの定義を返す                                                   |
+| `pbcms_preview.pb.js`    | 編集者に期限付きのプレビュー用トークンを発行し、`GET /api/cms/preview/{collection}/{id}` を追加する。サイトはこのトークンで下書きを1件読める |
 
 サニタイズでは、CMS のエディタが書き出すタグと属性（段落、見出し、リスト、リンク、画像、表、文字の揃えと色）だけを残し、script、イベントハンドラ、`javascript:` の URL などはすべて取り除きます。200,000 文字を超えるリッチテキストは保存できません。
 
@@ -56,6 +57,8 @@ CMS は本文中の画像を `<img src="…" data-media-id="<media のレコー�
 ファイルの URL の先頭には環境変数 `PBCMS_PUBLIC_URL`（例：`https://pb.example.com`）を使い、設定が無ければ PocketBase の設定の Application URL を使います。`X-Forwarded-Host` などのリクエストヘッダーは、クライアントが偽れるので使いません。
 
 `GET /api/cms/schema` に答えるのは `role = "editor"` の `users` のレコードだけです。トークンが無ければ 401、それ以外のアカウントは 403 になります（superuser も 403 です。superuser は PocketBase の `/api/collections` を使えます）。返すのは `{ "collections": [{ "id", "name", "type", "fields" }] }` で、設定の `collections` に書いたコレクションと `media.collection` を、その順に並べます。項目は PocketBase の定義そのままで、hidden の項目は除きます。ルール・インデックス・認証の設定は含めません。PocketBase に無い名前と、`_superusers` などのシステムのコレクションは飛ばします。フックは設定を、リクエストのたびに `pb_data` の隣の `pb_public/cms/config.json` から読むので、設定を入れ替えればすぐに反映されます。公開フォルダを別の場所に置いている場合（`--publicDir`）は、環境変数 `PBCMS_CONFIG_PATH` にそのファイルのパスを指定してください。設定を読めないときは 500 を返します。
+
+プレビューのフックを使うと、サイトに編集者のトークンを渡さずに下書きを見せられます。編集者が `POST /api/cms/preview/{collection}/{id}/token` を呼ぶと `{ "token", "expiresAt" }` が返ります。トークンはそのレコード1件だけに使え、10分で切れます（変えるには環境変数 `PBCMS_PREVIEW_TOKEN_DURATION` に秒数を指定します）。ログインしていなければ 401、編集者以外は 403、CMS が扱わないコレクション（`GET /api/cms/schema` と同じもの）や無いレコードは 404 になります。サイトは `GET /api/cms/preview/{collection}/{id}` を `Authorization: Bearer <token>` を付けて呼ぶと、コレクションの閲覧ルールにかかわらず、下書きを含めて PocketBase のレコードの API と同じ形でレコードを受け取ります。応答には `Cache-Control: no-store` が付きます。トークンが無い・正しくない・期限切れなら 401、別のレコードのトークンなら 403、レコードが消されていれば 404 です。トークンは編集者自身のトークンキーで署名するので、編集者のパスワードが変わったり、編集者の役割が外れたりすると、すぐに使えなくなります。PocketBase の認証トークンではなく、その代わりにもなりません。
 
 データベースに HTML が入る経路は、PocketBase を通した保存だけではありません。フックを入れる前に保存したレコード、バックアップからの復元、生の SQL、サニタイズのあとで値を書き換える別のフックは、保存時の無害化を通りません。そのため、メディアのフックは応答でもすべての `editor` 型の項目を無害化します。`media` を使わない場合も、両方のフックを入れてください。
 
@@ -72,7 +75,7 @@ app := pocketbase.New()
 pbcms.Register(app)
 ```
 
-`pbcms.Register` は `GET /api/cms/schema` を追加します。応答・権限の判定・`PBCMS_CONFIG_PATH` の扱いは `pbcms_schema.pb.js` と同じなので、このフックは一緒に入れないでください。ほかのフックはまだパッケージにありません。それまでは、[`tests/gopocketbase/main.go`](tests/gopocketbase/main.go) と同じように PocketBase の `jsvm` プラグインを登録し、`pbcms_sanitize.pb.js` と `pbcms_media_urls.pb.js` を `pb_hooks/` に置いてください。
+`pbcms.Register` は `GET /api/cms/schema` を追加します。応答・権限の判定・`PBCMS_CONFIG_PATH` の扱いは `pbcms_schema.pb.js` と同じなので、このフックは一緒に入れないでください。ほかのフックはまだパッケージにありません。それまでは、[`tests/gopocketbase/main.go`](tests/gopocketbase/main.go) と同じように PocketBase の `jsvm` プラグインを登録し、`pbcms_sanitize.pb.js`・`pbcms_media_urls.pb.js`・`pbcms_preview.pb.js` を、それらが読み込む `pbcms/` フォルダと一緒に `pb_hooks/` に置いてください。
 
 ## 開発
 

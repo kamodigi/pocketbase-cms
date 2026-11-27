@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { changedValues, draftKey, readDraft, removeDraft, writeDraft } from './draft'
+import { changedValues, draftKey, isSavedSince, readDraft, removeDraft, removeUserDrafts, writeDraft } from './draft'
 import { buildFormModel } from './model'
 import { initialValues } from './values'
 
@@ -38,6 +38,37 @@ describe('draftKey', () => {
 	})
 })
 
+function recordSavedAt(updated?: string) {
+	return { collectionId: 'c', collectionName: 'posts', id: 'p1', updated }
+}
+
+describe('isSavedSince', () => {
+	const draft = { ownSlugs: {}, recordUpdated: '2026-01-02 03:04:00.000Z', savedAt, values: {} }
+
+	it('tells a record saved again from the one the input was made on', () => {
+		expect(isSavedSince(draft, recordSavedAt(draft.recordUpdated))).toBe(false)
+		expect(isSavedSince(draft, recordSavedAt('2026-01-03 00:00:00.000Z'))).toBe(true)
+	})
+
+	it('does not guess without both timestamps', () => {
+		expect(isSavedSince(draft, recordSavedAt())).toBe(false)
+		expect(isSavedSince(draft, undefined)).toBe(false)
+		expect(isSavedSince({ ...draft, recordUpdated: '' }, recordSavedAt(draft.recordUpdated))).toBe(false)
+	})
+})
+
+describe('removeUserDrafts', () => {
+	it('removes the drafts of that editor and nothing else', () => {
+		const kept = [draftKey('u10', 'posts', 'p1'), draftKey('u2', 'posts'), 'pocketbase_auth']
+		for (const name of [key, draftKey('u1', 'stores'), ...kept]) localStorage.setItem(name, 'x')
+
+		removeUserDrafts('u1')
+
+		expect(Object.keys(localStorage)).toHaveLength(kept.length)
+		expect(Object.keys(localStorage)).toEqual(expect.arrayContaining(kept))
+	})
+})
+
 describe('changedValues', () => {
 	it('holds the editable fields that differ', () => {
 		expect(changedValues(model, initial, initial)).toEqual({})
@@ -50,7 +81,8 @@ describe('changedValues', () => {
 
 describe('readDraft', () => {
 	it('gives back what was written, an emptied number included', () => {
-		const draft = { ownSlugs: { slug: true }, savedAt, values: { pinned: true, rank: undefined, tags: ['b'] } }
+		const values = { pinned: true, rank: undefined, tags: ['b'] }
+		const draft = { ownSlugs: { slug: true }, recordUpdated: savedAt, savedAt, values }
 		writeDraft(key, draft)
 		const read = readDraft(key, model, initial)
 		expect(read).toStrictEqual(draft)
@@ -94,7 +126,7 @@ describe('writeDraft', () => {
 		vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
 			throw new Error('full')
 		})
-		writeDraft(key, { ownSlugs: {}, savedAt, values: { title: 'Winter blend' } })
+		writeDraft(key, { ownSlugs: {}, recordUpdated: '', savedAt, values: { title: 'Winter blend' } })
 		expect(localStorage.getItem(key)).toBeNull()
 	})
 
@@ -103,5 +135,7 @@ describe('writeDraft', () => {
 			throw new Error('blocked')
 		})
 		expect(() => removeDraft(key)).not.toThrow()
+		localStorage.setItem(key, 'x')
+		expect(() => removeUserDrafts('u1')).not.toThrow()
 	})
 })

@@ -1,5 +1,7 @@
-// Unsaved input of an edit screen, kept in the browser until it is saved or discarded (decision 40).
-// Storage can be unavailable or full; the form then works as before, without drafts.
+// Unsaved input of an edit screen, kept in the browser until it is saved or discarded, or its editor
+// signs out (decision 40). Storage can be unavailable or full; the form then works as before, without drafts.
+import type { RecordModel } from 'pocketbase'
+
 import type { FormModel } from './model'
 
 import { editableFields, type FormValue, type FormValues, isSameValue, toInputValue } from './values'
@@ -9,6 +11,10 @@ export interface Draft {
 	For slugs with a source field: whether the user wrote the slug, so it stops following the source.
 	*/
 	ownSlugs: Record<string, boolean>
+	/**
+	The `updated` of the record the input was made on; empty for a new record or without that field.
+	*/
+	recordUpdated: string
 	/**
 	When the draft was written, as an ISO 8601 string.
 	*/
@@ -36,7 +42,15 @@ export function changedValues(model: FormModel, values: FormValues, initial: For
 One draft per editor and record; every new record of a collection shares one.
 */
 export function draftKey(userId: string, collection: string, recordId = 'new'): string {
-	return `pbcms:draft:${userId}:${collection}/${recordId}`
+	return `${userPrefix(userId)}${collection}/${recordId}`
+}
+
+/**
+Whether the record was saved again after the draft's input was made on it. Unknown counts as not.
+*/
+export function isSavedSince(draft: Draft, record: RecordModel | undefined): boolean {
+	const updated = recordUpdated(record)
+	return draft.recordUpdated !== '' && updated !== '' && draft.recordUpdated !== updated
 }
 
 /**
@@ -64,12 +78,30 @@ export function readDraft(key: string, model: FormModel, initial: FormValues): D
 		removeDraft(key)
 		return undefined
 	}
-	return { ownSlugs: stored.ownSlugs, savedAt: stored.savedAt, values }
+	return { ...stored, values }
+}
+
+export function recordUpdated(record: RecordModel | undefined): string {
+	const updated: unknown = record?.['updated']
+	return typeof updated === 'string' ? updated : ''
 }
 
 export function removeDraft(key: string): void {
 	try {
 		localStorage.removeItem(key)
+	} catch {
+		// Nothing was stored.
+	}
+}
+
+/**
+Removes every draft of one editor, so that a shared computer keeps nothing after signing out.
+*/
+export function removeUserDrafts(userId: string): void {
+	try {
+		for (const key of Object.keys(localStorage)) {
+			if (key.startsWith(userPrefix(userId))) localStorage.removeItem(key)
+		}
 	} catch {
 		// Nothing was stored.
 	}
@@ -99,9 +131,7 @@ function isObject(value: unknown): value is Record<string, unknown> {
 	return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
-function parse(
-	text: string,
-): undefined | { ownSlugs: Record<string, boolean>; savedAt: string; values: Record<string, unknown> } {
+function parse(text: string): (Omit<Draft, 'values'> & { values: Record<string, unknown> }) | undefined {
 	let data: unknown
 	try {
 		data = JSON.parse(text)
@@ -109,12 +139,13 @@ function parse(
 		return undefined
 	}
 	if (!isObject(data) || !isObject(data.values)) return undefined
-	const { ownSlugs, savedAt, values } = data
+	const { ownSlugs, recordUpdated, savedAt, values } = data
 	if (typeof savedAt !== 'string' || Number.isNaN(Date.parse(savedAt))) return undefined
 	return {
 		ownSlugs: isObject(ownSlugs)
 			? Object.fromEntries(Object.entries(ownSlugs).map(([name, own]) => [name, own === true]))
 			: {},
+		recordUpdated: typeof recordUpdated === 'string' ? recordUpdated : '',
 		savedAt,
 		values,
 	}
@@ -126,4 +157,8 @@ function storedText(key: string): string | undefined {
 	} catch {
 		return undefined
 	}
+}
+
+function userPrefix(userId: string): string {
+	return `pbcms:draft:${userId}:`
 }

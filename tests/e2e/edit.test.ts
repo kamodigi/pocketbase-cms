@@ -202,3 +202,41 @@ test('unsaved input survives closing the tab, to be restored or discarded', asyn
 
 	await editor.collection('stores').delete(store.id)
 })
+
+test('signing out removes the kept input, an expired session keeps it', async ({ baseURL, page }) => {
+	const editor = await asEditor(baseURL!)
+	const tag = uniqueTag()
+	const store = await editor
+		.collection('stores')
+		.create({ address: '1 Dock Street', name: `Mole ${tag}`, region: 'south' })
+	const path = `/cms/#/collections/stores/${store.id}`
+	await signIn(page)
+	await page.goto(path)
+	const address = page.getByRole('textbox', { name: 'Address' })
+	await address.fill('6 Dock Street')
+
+	// A token PocketBase refuses sends the editor to sign in again.
+	await page.evaluate(() => {
+		const auth = JSON.parse(localStorage.getItem('pocketbase_auth')!) as object
+		localStorage.setItem('pocketbase_auth', JSON.stringify({ ...auth, token: 'expired' }))
+	})
+	await page.reload()
+	await expect(page.getByRole('button', { name: 'Sign in' })).toBeVisible()
+	await signIn(page)
+	// Someone else saves the record in the meantime.
+	await editor.collection('stores').update(store.id, { name: `Mole ${tag} 2` })
+	await page.goto(path)
+	await expect(draftPrompt(page)).toContainText('This record was saved again after that.')
+	await page.getByRole('button', { name: 'Restore' }).click()
+	await expect(address).toHaveValue('6 Dock Street')
+	await expect(page.getByRole('textbox', { name: /^Name/ })).toHaveValue(`Mole ${tag} 2`)
+
+	await page.getByRole('button', { name: 'Sign out' }).click()
+	await expect(page.getByRole('button', { name: 'Sign in' })).toBeVisible()
+	await signIn(page)
+	await page.goto(path)
+	await expect(address).toHaveValue('1 Dock Street')
+	await expect(draftPrompt(page)).toBeHidden()
+
+	await editor.collection('stores').delete(store.id)
+})

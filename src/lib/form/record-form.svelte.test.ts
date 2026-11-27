@@ -245,6 +245,45 @@ describe('RecordForm', () => {
 		expect(drafts()).toEqual([])
 	})
 
+	it('warns when the record was saved after the input was kept, until it is saved', async () => {
+		const user = userEvent.setup()
+		const newer = { ...record, rank: 5, updated: '2026-02-01 00:00:00.000Z' }
+		const warning = /This record was saved again after that/
+		const first = show({ record })
+		await user.type(screen.getByRole('textbox', { name: /^Title/ }), ' blend')
+		expect(screen.queryByText(warning)).not.toBeInTheDocument()
+		first.unmount()
+
+		const unchanged = show({ record })
+		expect(screen.queryByText(warning)).not.toBeInTheDocument()
+		unchanged.unmount()
+
+		const second = show({ record: newer })
+		expect(screen.getByRole('region', { name: /^You have unsaved changes/ })).toHaveAccessibleDescription(warning)
+		await user.click(screen.getByRole('button', { name: 'Restore' }))
+		expect(screen.getByRole('textbox', { name: /^Title/ })).toHaveValue('Autumn blend')
+		// Restored and left again without saving: still input made before that save.
+		await user.type(screen.getByRole('textbox', { name: /^Title/ }), 's')
+		second.unmount()
+
+		serve(200, { ...newer, title: 'Autumn blends', updated: '2026-02-02 00:00:00.000Z' })
+		show({ record: newer })
+		expect(screen.getByText(warning)).toBeInTheDocument()
+		await user.click(screen.getByRole('button', { name: 'Restore' }))
+		await user.click(screen.getByRole('button', { name: 'Save' }))
+		await waitFor(() => expect(drafts()).toEqual([]))
+		await user.type(screen.getByRole('textbox', { name: /^Title/ }), '!')
+		await waitFor(() => expect(localStorage.getItem(drafts()[0]!)).toContain('2026-02-02'))
+	})
+
+	it('writes no draft once its editor is signed out', async () => {
+		const user = userEvent.setup()
+		show({ record })
+		pb.authStore.clear()
+		await user.type(screen.getByRole('textbox', { name: /^Title/ }), ' blend')
+		expect(drafts()).toEqual([])
+	})
+
 	it('discards kept input', async () => {
 		const user = userEvent.setup()
 		const first = show({ record })

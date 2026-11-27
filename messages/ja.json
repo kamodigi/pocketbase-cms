@@ -82,6 +82,7 @@
 	"record_select_none": "なし",
 	"record_draft_title": "保存していない変更があります。復元しますか？",
 	"record_draft_saved_at": "{time} にこのブラウザに一時保存した内容です。",
+	"record_draft_saved_since": "この後に別の保存がありました。復元すると、入力した項目は新しい内容の代わりに下書きの内容になります（保存するまで送信しません）。",
 	"record_draft_restore": "復元",
 	"record_draft_discard": "破棄",
 	"form_required": "必須",

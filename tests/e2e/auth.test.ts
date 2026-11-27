@@ -17,6 +17,19 @@ async function asSuperuser(baseURL: string): Promise<PocketBase> {
 	return pb
 }
 
+/**
+Leaves a session in the browser that PocketBase no longer accepts, as after it expired.
+*/
+async function keepStaleSession(page: Page) {
+	await page.addInitScript(() => {
+		if (sessionStorage.getItem('stale-session')) return
+		sessionStorage.setItem('stale-session', 'set')
+		const payload = btoa(JSON.stringify({ exp: 1, type: 'auth' }))
+		const record = { collectionName: 'users', id: 'gone', role: 'editor' }
+		localStorage.setItem('pocketbase_auth', JSON.stringify({ record, token: `e30.${payload}.signature` }))
+	})
+}
+
 async function signIn(page: Page, email: string, password: string) {
 	await page.getByLabel('Email').fill(email)
 	await page.getByLabel('Password').fill(password)
@@ -137,4 +150,21 @@ test('a password reset email is sent from the sign-in screen', async ({ baseURL,
 
 	await page.getByRole('link', { name: 'Back to sign in' }).click()
 	await expect(page.getByRole('heading', { level: 1, name: 'Sign in' })).toBeVisible()
+})
+
+test('an expired session does not block signing in again', async ({ page }) => {
+	await keepStaleSession(page)
+	await page.goto('/cms/#/login')
+	await signIn(page, editor.email, editor.password)
+
+	await expect(page.getByRole('heading', { level: 1, name: 'Posts' })).toBeVisible()
+})
+
+test('an expired session does not block a password reset', async ({ page }) => {
+	await keepStaleSession(page)
+	await page.goto('/cms/#/password-reset')
+	await page.getByLabel('Email').fill(editor.email)
+	await page.getByRole('button', { name: 'Send reset link' }).click()
+
+	await expect(page.getByRole('status')).toContainText(editor.email)
 })

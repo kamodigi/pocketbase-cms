@@ -58,6 +58,15 @@ describe('signIn', () => {
 		expect(String(fetch.mock.calls[0]?.[0])).toBe('http://pocketbase.test/api/collections/users/auth-with-password')
 	})
 
+	it('does not send a token left from an earlier session', async () => {
+		const fetch = respond(200, { record: user(), token: token() })
+		vi.stubGlobal('fetch', fetch)
+		pb.authStore.save('stale-token', user())
+
+		await signIn(pb, 'editor@example.com', 'secret')
+		expect(new Headers(fetch.mock.calls[0]?.[1]?.headers).get('Authorization')).toBe('')
+	})
+
 	it('signs anyone else out again at once', async () => {
 		vi.stubGlobal('fetch', respond(200, { record: user({ role: '' }), token: token() }))
 
@@ -91,6 +100,15 @@ describe('requestPasswordReset', () => {
 		const [url, init] = fetch.mock.calls[0] ?? []
 		expect(String(url)).toBe('http://pocketbase.test/api/collections/users/request-password-reset')
 		expect(JSON.parse(String(init?.body))).toEqual({ email: 'editor@example.com' })
+	})
+
+	it('does not send a token left from an earlier session', async () => {
+		const fetch = vi.fn<typeof globalThis.fetch>(async () => new Response(undefined, { status: 204 }))
+		vi.stubGlobal('fetch', fetch)
+		pb.authStore.save('stale-token', user())
+
+		await requestPasswordReset(pb, 'editor@example.com')
+		expect(new Headers(fetch.mock.calls[0]?.[1]?.headers).get('Authorization')).toBe('')
 	})
 
 	it('tells an invalid address (400) apart from other failures', async () => {

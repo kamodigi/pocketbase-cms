@@ -15,6 +15,12 @@ export type PasswordResetResult = { ok: false; reason: 'invalid-email' | 'unavai
 export type SignInResult = { ok: false; reason: 'credentials' | 'not-editor' | 'unavailable' } | { ok: true }
 
 /**
+For requests anyone may make. The SDK would send the stored token even after it stopped working, and
+PocketBase (since v0.42) answers 401 to a token it does not accept.
+*/
+const withoutToken = { headers: { Authorization: '' } }
+
+/**
 Whether the stored session belongs to an editor and its token has not expired. The server may still
 refuse the token (a deleted account, a changed role); requests then fail with 401 or 403.
 */
@@ -35,7 +41,7 @@ the address has an account or not, so the result never tells who has one.
 */
 export async function requestPasswordReset(pb: PocketBase, email: string): Promise<PasswordResetResult> {
 	try {
-		await pb.collection(editorCollection).requestPasswordReset(email)
+		await pb.collection(editorCollection).requestPasswordReset(email, withoutToken)
 		return { ok: true }
 	} catch (error) {
 		return {
@@ -50,7 +56,7 @@ Signs in with a `users` account. Anyone but an editor is signed out again at onc
 */
 export async function signIn(pb: PocketBase, email: string, password: string): Promise<SignInResult> {
 	try {
-		const { record } = await pb.collection(editorCollection).authWithPassword(email, password)
+		const { record } = await pb.collection(editorCollection).authWithPassword(email, password, withoutToken)
 		if (!isEditor(record)) {
 			pb.authStore.clear()
 			return { ok: false, reason: 'not-editor' }

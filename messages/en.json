@@ -81,6 +81,8 @@
 	"record_slug_generate": "Make from {field}",
 	"record_select_none": "None",
 	"form_required": "Required",
+	"form_locale_tabs": "Language of {field}",
+	"form_locale_has_error": "has an error",
 	"form_error_required": "This field is required.",
 	"form_error_min_length": "Enter at least {min} characters.",
 	"form_error_max_length": "Enter {max} characters or fewer.",

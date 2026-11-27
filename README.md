@@ -67,6 +67,55 @@ On the edit screen, a `relation` field shows the chosen records by name. "Choose
 - **Search** matches that name field and the related collection's `list.search`. Records are in its `list.sort` order.
 - **Collections outside the config** (such as `users`) work too. PocketBase's list and view rules decide which of their records an editor can choose, and their names are read from `displayField`, `name`, `title` or `email`.
 
+### Draft previews on your site
+
+Give a collection a `previewUrl`, the absolute `http` or `https` address of a page on your site, and the edit screen of its saved records gets a **Preview on site** button:
+
+```json
+{
+	"collections": {
+		"news": { "previewUrl": "https://www.example.com/news/preview" }
+	}
+}
+```
+
+A collection without `previewUrl` has no button. It needs the preview hook, `pbcms_preview.pb.js` (see [PocketBase hooks](#pocketbase-hooks)), or the [Go package](#go-package). There is no helper library: your site implements the page from the description below.
+
+**What your page receives.** The button opens a new tab and submits an HTML form to `previewUrl`: a `POST` with an `application/x-www-form-urlencoded` body.
+
+| Field        | Value                                                     |
+| ------------ | --------------------------------------------------------- |
+| `collection` | The collection's name, such as `news`                     |
+| `id`         | The record's id                                           |
+| `token`      | A preview token for this one record, valid for 10 minutes |
+
+The values are those of the saved record: changes not saved yet are not shown. More fields may be added later, so ignore the ones you don't know.
+
+**How your page reads the draft.** Call PocketBase with the token:
+
+```http
+GET https://pb.example.com/api/cms/preview/news/abc123def456ghi
+Authorization: Bearer <token>
+```
+
+| Status | Meaning                                                                                           |
+| ------ | ------------------------------------------------------------------------------------------------- |
+| 200    | The record as PocketBase's record API returns it, drafts included, with `Cache-Control: no-store` |
+| 401    | The token is missing, invalid or expired. Ask the editor to open the preview from the CMS again   |
+| 403    | The token is for another record                                                                   |
+| 404    | The record has been deleted                                                                       |
+
+Relations come as ids. To show related records, read them from PocketBase's record API as your public pages do; the token does not open anything but its one record.
+
+**What your page should do.**
+
+- Accept a cross-origin form `POST`. Many frameworks refuse one by default as CSRF protection, so allow the CMS's origin or exempt this route. Cookies marked `SameSite=Lax` or `Strict` are not sent with it.
+- Treat the fields as untrusted input, because anyone can send this form: accept only the collections you have a page for, check the id's format, and always call your own PocketBase, never an address taken from the request.
+- Serve the page over HTTPS, keep the token out of URLs and logs, and don't cache or index the page (`Cache-Control: no-store`, `noindex`).
+- Show rich text only with the hooks that sanitize it installed (see below).
+
+[`examples/lantern-coffee/preview-site/server.mjs`](examples/lantern-coffee/preview-site/server.mjs) is a small page that does this, with no dependencies. The example config points `posts` and `about` at it, so with the [development PocketBase](#try-it-with-a-development-pocketbase) running, start it with `node examples/lantern-coffee/preview-site/server.mjs` and press the button. In your own site's config, change or remove those `previewUrl`s.
+
 ## PocketBase hooks
 
 The JavaScript hooks live in [`hooks/pb_hooks/`](hooks/pb_hooks). Copy the files you need, together with the `pbcms/` folder they load, into your PocketBase's `pb_hooks/`.
@@ -193,6 +242,7 @@ Sign in at the CMS with `editor@example.com` / `password1234`. The PocketBase da
 
 - `examples/lantern-coffee/pb_migrations/` holds the JavaScript migrations, including `users.role`. Put them in your PocketBase's `pb_migrations/`.
 - `examples/lantern-coffee/cms.config.json` is the matching config. Copy it to `pb_public/cms/config.json`.
+- `examples/lantern-coffee/preview-site/` is the page the config's `previewUrl` points at (see [Draft previews on your site](#draft-previews-on-your-site)).
 - Every collection has `created` and `updated` (autodate) fields. Collections made by migrations don't get them automatically.
 
 ## License

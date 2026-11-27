@@ -12,6 +12,7 @@
 	import * as Dialog from '#lib/components/ui/dialog/index.js'
 	import { type CmsConfig, type SchemaCollection } from '#lib/config/index.js'
 	import { pb } from '#lib/pocketbase.js'
+	import PreviewButton from '#lib/preview/preview-button.svelte'
 	import { m } from '#paraglide/messages.js'
 
 	import FieldInput from './field-input.svelte'
@@ -46,6 +47,7 @@
 	// The props stay the same for the life of the form: the page renders a new form per record.
 	const model = untrack(() => buildFormModel(config, schema, uiLocale, collections))
 	const isSingleton = untrack(() => Boolean(config.collections[collection]?.singleton))
+	const previewUrl = untrack(() => config.collections[collection]?.previewUrl)
 	const fields = [...model.main, ...model.side]
 
 	// The record as PocketBase last returned it, and the inputs as they were then.
@@ -74,6 +76,12 @@
 
 	const title = $derived(recordTitle(saved))
 	const heading = $derived(isSingleton ? label : saved ? title || m.list_untitled() : m.record_new_heading())
+
+	// The preview shows the record as saved, so it says when the inputs have moved on.
+	const hasUnsavedChanges = $derived.by(() => {
+		const changes = recordPayload(model, values, { initial, now: new Date() })
+		return Object.keys(changes).length > 0
+	})
 
 	function changed(field: FormField) {
 		if (Object.hasOwn(ownSlugs, field.name)) ownSlugs[field.name] = values[field.name] !== ''
@@ -249,6 +257,12 @@
 		<Button disabled={isSaving} type="submit">
 			{isSaving ? m.record_saving() : saved ? m.record_save() : m.record_create()}
 		</Button>
+		{#if saved && previewUrl !== undefined}
+			<PreviewButton {collection} id={saved.id} url={previewUrl} />
+			{#if hasUnsavedChanges}
+				<p class="text-muted-foreground text-sm" role="status">{m.preview_unsaved()}</p>
+			{/if}
+		{/if}
 		{#if saved && !isSingleton}
 			<Dialog.Root bind:open={isDeleteOpen}>
 				<Dialog.Trigger>

@@ -110,5 +110,9 @@
 	"relation_error": "Could not load the records: {message}",
 	"relation_retry": "Try again",
 	"relation_done": "Done",
-	"relation_close": "Close"
+	"relation_close": "Close",
+	"preview_button": "Preview on site",
+	"preview_unsaved": "The preview does not show unsaved changes.",
+	"preview_error": "Could not open the preview: {message}",
+	"preview_error_blocked": "The browser blocked the new tab. Allow pop-ups for this page, then try again."
 }

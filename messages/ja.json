@@ -110,5 +110,9 @@
 	"relation_error": "レコードを読み込めませんでした：{message}",
 	"relation_retry": "もう一度試す",
 	"relation_done": "完了",
-	"relation_close": "閉じる"
+	"relation_close": "閉じる",
+	"preview_button": "サイトで確認",
+	"preview_unsaved": "保存していない変更はプレビューに反映されません。",
+	"preview_error": "プレビューを開けませんでした：{message}",
+	"preview_error_blocked": "ブラウザが新しいタブをブロックしました。このページのポップアップを許可してから、もう一度お試しください。"
 }

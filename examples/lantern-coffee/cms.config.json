@@ -17,6 +17,7 @@
 			"label": "Posts",
 			"icon": "newspaper",
 			"titleField": "title",
+			"previewUrl": "http://127.0.0.1:3001/preview",
 			"status": { "draftField": "draft", "publishedAtField": "published_at" },
 			"list": {
 				"columns": ["title", "category", "$status", "published_at", "updated"],
@@ -63,6 +64,7 @@
 			"label": "About page",
 			"icon": "info",
 			"singleton": true,
+			"previewUrl": "http://127.0.0.1:3001/preview",
 			"titleField": "title",
 			"fields": {
 				"title": { "label": "Title" },

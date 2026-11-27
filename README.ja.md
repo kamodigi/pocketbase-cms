@@ -13,25 +13,39 @@
 
 ## 仕組み（予定）
 
-- CMS は静的な SPA です。PocketBase の `pb_public/cms/` にコピーし、`https://<PocketBase のドメイン>/cms/` で開きます。
+- CMS は静的な SPA です。PocketBase の `pb_public/` の下のフォルダ（`pb_public/cms/` など）にコピーし、`https://<PocketBase のドメイン>/cms/` で開きます。
 - 編集者は、PocketBase の `users` のうち `role = "editor"` のアカウントでログインします。実際のアクセス制御は PocketBase の API ルールが担います。
 - 入力欄はコレクションのスキーマから作ります。アプリの隣に置く `cms.config.json` では、表示名・並び順・一覧の列などの見せ方だけを指定します。
 - 小さな PocketBase のフック（JavaScript の `pb_hooks` または Go のパッケージ）が、編集者へのスキーマの公開、保存時のリッチテキストの無害化、内容が変わったときのサイトへの通知を担います。
 
 ## 導入
 
-[リリース](https://github.com/kamodigi/pocketbase-cms/releases)は2つの形で配ります。以下の `0.1.0` は使うバージョンに置き換えてください。
+[リリース](https://github.com/kamodigi/pocketbase-cms/releases)は2つの形で配ります。以下の `0.2.0` は使うバージョンに置き換えてください。
 
 **Docker イメージ。** `ghcr.io/kamodigi/pocketbase-cms` の `/dist` に、ビルド済みの CMS が入っています。イメージは起動せず、PocketBase のイメージからファイルを取り出して使います。
 
 ```dockerfile
-COPY --from=ghcr.io/kamodigi/pocketbase-cms:0.1.0 /dist /pb/pb_public/cms
+COPY --from=ghcr.io/kamodigi/pocketbase-cms:0.2.0 /dist /pb/pb_public/cms
 COPY cms.config.json /pb/pb_public/cms/config.json
 ```
 
 イメージに入っているのは CMS だけです。[PocketBase のフック](#pocketbase-のフック)は同じバージョンの zip から取るか、Go パッケージを使います。
 
-**zip。** リリースに添付する `pocketbase-cms_0.1.0.zip` には、`cms/`（ビルド済みの CMS）、`pb_hooks/`（JavaScript のフック）、ライセンスが入っています。`cms/` を `pb_public/cms/` に、`pb_hooks/` の中身を自分の `pb_hooks/` に、設定ファイルを `pb_public/cms/config.json` にコピーします。更新するときは、古いバージョンのファイルが残らないように `pb_public/cms/` を丸ごと入れ替えてください。
+**zip。** リリースに添付する `pocketbase-cms_0.2.0.zip` には、`cms/`（ビルド済みの CMS）、`pb_hooks/`（JavaScript のフック）、ライセンスが入っています。`cms/` を `pb_public/cms/` に、`pb_hooks/` の中身を自分の `pb_hooks/` に、設定ファイルを `pb_public/cms/config.json` にコピーします。更新するときは、古いバージョンのファイルが残らないように `pb_public/cms/` を丸ごと入れ替えてください。
+
+### 別のフォルダに置く
+
+`cms` はいつもの名前というだけです。CMS は自分のアドレスを基準にファイルと `config.json` を探すので、同じビルドが `pb_public/` の下のどのフォルダでも動きます（バージョン 0.2.0 から）。たとえば `https://<PocketBase のドメイン>/edit/` で開くときは、次のようにします。
+
+```dockerfile
+COPY --from=ghcr.io/kamodigi/pocketbase-cms:0.2.0 /dist /pb/pb_public/edit
+COPY cms.config.json /pb/pb_public/edit/config.json
+ENV PBCMS_CONFIG_PATH=/pb/pb_public/edit/config.json
+```
+
+zip を使うときは、`cms/` を `pb_public/edit/` に、設定ファイルを `pb_public/edit/config.json` にコピーします。
+
+[フックと Go パッケージ](#pocketbase-のフック)は、環境変数 `PBCMS_CONFIG_PATH` で別のファイルを指定しない限り、`pb_public/cms/config.json` を読みます。フォルダが `cms` でないときは必ず設定してください。この README の `pb_public/cms/` は、自分のフォルダに読み替えてください。`api` と `_` は PocketBase 自身のページで使うので、フォルダの名前にしないでください。
 
 ## 設定ファイル
 
@@ -201,7 +215,7 @@ CMS は本文中の画像を `<img src="…" data-media-id="<media のレコー�
 
 ファイルの URL の先頭には環境変数 `PBCMS_PUBLIC_URL`（例：`https://pb.example.com`）を使い、設定が無ければ PocketBase の設定の Application URL を使います。`X-Forwarded-Host` などのリクエストヘッダーは、クライアントが偽れるので使いません。
 
-`GET /api/cms/schema` に答えるのは `role = "editor"` の `users` のレコードだけです。トークンが無ければ 401、それ以外のアカウントは 403 になります（superuser も 403 です。superuser は PocketBase の `/api/collections` を使えます）。返すのは `{ "collections": [{ "id", "name", "type", "fields" }] }` で、設定の `collections` に書いたコレクションと `media.collection` を、その順に並べます。項目は PocketBase の定義そのままで、hidden の項目は除きます。ルール・インデックス・認証の設定は含めません。PocketBase に無い名前と、`_superusers` などのシステムのコレクションは飛ばします。フックは設定を、リクエストのたびに `pb_data` の隣の `pb_public/cms/config.json` から読むので、設定を入れ替えればすぐに反映されます。公開フォルダを別の場所に置いている場合（`--publicDir`）は、環境変数 `PBCMS_CONFIG_PATH` にそのファイルのパスを指定してください。設定を読めないときは 500 を返します。
+`GET /api/cms/schema` に答えるのは `role = "editor"` の `users` のレコードだけです。トークンが無ければ 401、それ以外のアカウントは 403 になります（superuser も 403 です。superuser は PocketBase の `/api/collections` を使えます）。返すのは `{ "collections": [{ "id", "name", "type", "fields" }] }` で、設定の `collections` に書いたコレクションと `media.collection` を、その順に並べます。項目は PocketBase の定義そのままで、hidden の項目は除きます。ルール・インデックス・認証の設定は含めません。PocketBase に無い名前と、`_superusers` などのシステムのコレクションは飛ばします。フックは設定を、リクエストのたびに `pb_data` の隣の `pb_public/cms/config.json` から読むので、設定を入れ替えればすぐに反映されます。CMS を[別のフォルダ](#別のフォルダに置く)に置いている場合や、公開フォルダを別の場所に置いている場合（`--publicDir`）は、環境変数 `PBCMS_CONFIG_PATH` にそのファイルのパスを指定してください。設定を読めないときは 500 を返します。
 
 プレビューのフックを使うと、サイトに編集者のトークンを渡さずに下書きを見せられます。編集者が `POST /api/cms/preview/{collection}/{id}/token` を呼ぶと `{ "token", "expiresAt" }` が返ります。トークンはそのレコード1件だけに使え、10分で切れます（変えるには環境変数 `PBCMS_PREVIEW_TOKEN_DURATION` に秒数を指定します）。ログインしていなければ 401、編集者以外は 403、CMS が扱わないコレクション（`GET /api/cms/schema` と同じもの）や無いレコードは 404 になります。サイトは `GET /api/cms/preview/{collection}/{id}` を `Authorization: Bearer <token>` を付けて呼ぶと、コレクションの閲覧ルールにかかわらず、下書きを含めて PocketBase のレコードの API と同じ形でレコードを受け取ります。応答には `Cache-Control: no-store` が付きます。トークンが無い・正しくない・期限切れなら 401、別のレコードのトークンなら 403、レコードが消されていれば 404 です。トークンは編集者自身のトークンキーで署名するので、編集者のパスワードが変わったり、編集者の役割が外れたりすると、すぐに使えなくなります。PocketBase の認証トークンではなく、その代わりにもなりません。
 
@@ -260,7 +274,7 @@ pnpm dev      # 開発サーバー http://localhost:5173/cms/
 pnpm check    # 型チェック
 pnpm lint     # prettier と eslint
 pnpm test     # ユニットテスト
-pnpm build    # build/ に静的ファイルを書き出す
+pnpm build    # build/ に静的ファイルを書き出す（pb_public/ のどのフォルダにも置ける）
 go vet ./... && go test ./...   # Go パッケージ
 ```
 
@@ -271,7 +285,7 @@ go vet ./... && go test ./...   # Go パッケージ
 ```sh
 pnpm test:integration                  # API ルールとフック（tests/integration/）
 pnpm exec playwright install chromium  # 最初の E2E の前に一度だけ
-pnpm build && pnpm test:e2e            # pb_public/cms/ に置いたビルド済みの CMS（tests/e2e/）
+pnpm build && pnpm test:e2e            # pb_public/cms/ などのフォルダに置いたビルド済みの CMS（tests/e2e/）
 ```
 
 `PBCMS_POCKETBASE=go` を付けると、同じテストを、公式バイナリの代わりに `tests/gopocketbase/` の Go で組み立てた PocketBase（`pbcms` パッケージ入り。Go が必要）に対して動かします。パッケージが置き換える JavaScript のフックは入れません。CI では両方を動かします。
@@ -321,21 +335,21 @@ CMS には `editor@example.com` / `password1234` でログインします。Pock
 
 CMS、JavaScript のフック、Go パッケージのバージョンは1つで、[セマンティックバージョニング](https://semver.org/lang/ja/)に従います。メジャーバージョンが 0 の間は、マイナーリリースで互換性が壊れることがあります（パッチリリースでは壊しません）。更新の前にリリースノートを読んでください。
 
-| 対象            | バージョン 0.1.0 の名前                                        |
+| 対象            | バージョン 0.2.0 の名前                                        |
 | --------------- | -------------------------------------------------------------- |
-| Git のタグ      | `v0.1.0`（`go get …/pbcms@v0.1.0` もこれを使う）               |
-| Docker イメージ | `ghcr.io/kamodigi/pocketbase-cms:0.1.0`（`latest` は付けない） |
-| リリースの zip  | `pocketbase-cms_0.1.0.zip`                                     |
+| Git のタグ      | `v0.2.0`（`go get …/pbcms@v0.2.0` もこれを使う）               |
+| Docker イメージ | `ghcr.io/kamodigi/pocketbase-cms:0.2.0`（`latest` は付けない） |
+| リリースの zip  | `pocketbase-cms_0.2.0.zip`                                     |
 
 バージョンを書く場所はタグだけです（`package.json` の `version` は `0.0.0` のままです）。リリースするには、`main` のコミットにタグを打って push します。
 
 ```sh
 git fetch origin
-git tag -a v0.1.0 -m v0.1.0 origin/main
-git push origin v0.1.0
+git tag -a v0.2.0 -m v0.2.0 origin/main
+git push origin v0.2.0
 ```
 
-[リリースのワークフロー](.github/workflows/release.yml)は、CI をすべて実行してから、イメージ（`linux/amd64` と `linux/arm64`）を push し、zip を添付した GitHub のリリースを作ります。`v0.1.0-rc.1` のように接尾辞の付いたタグはプレリリースになります。公開したタグは動かしたり使い回したりしないでください。Go のモジュールプロキシは、最初に取得した中身を保持します。バージョン 2 には先に `go.mod` のモジュールのパスに `/v2` が必要なので、それまでパッケージ化のスクリプトは受け付けません。
+[リリースのワークフロー](.github/workflows/release.yml)は、CI をすべて実行してから、イメージ（`linux/amd64` と `linux/arm64`）を push し、zip を添付した GitHub のリリースを作ります。`v0.2.0-rc.1` のように接尾辞の付いたタグはプレリリースになります。公開したタグは動かしたり使い回したりしないでください。Go のモジュールプロキシは、最初に取得した中身を保持します。バージョン 2 には先に `go.mod` のモジュールのパスに `/v2` が必要なので、それまでパッケージ化のスクリプトは受け付けません。
 
 GHCR は新しいパッケージを非公開で作ります。最初のリリースの後に一度だけ、メンテナーが GitHub のパッケージの設定で公開に変えてください。
 

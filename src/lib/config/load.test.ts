@@ -25,7 +25,10 @@ describe('loadConfig', () => {
 	it('explains where the file goes when it is missing', async () => {
 		await expect(loadConfig(respondWith('', 404))).resolves.toEqual({
 			errors: [
-				{ message: 'config.json was not found. Copy your cms.config.json to pb_public/cms/config.json.', path: '' },
+				{
+					message: "config.json was not found. Copy your cms.config.json to config.json next to the CMS's index.html.",
+					path: '',
+				},
 			],
 			ok: false,
 		})

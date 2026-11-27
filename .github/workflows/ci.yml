@@ -5,6 +5,8 @@ on:
     branches: [main]
   push:
     branches: [main]
+  # The release workflow runs all of this before it publishes.
+  workflow_call:
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -129,4 +131,44 @@ jobs:
         with:
           name: playwright-results
           path: test-results/
+          retention-days: 7
+
+  package:
+    # What a release publishes, built the same way. On a pull request the version is a placeholder.
+    name: Release package (zip, image)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      TAG: ${{ github.ref_type == 'tag' && github.ref_name || 'v0.0.0-dev' }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm build
+
+      - name: Pack the zip
+        run: release/package.sh "$TAG"
+
+      - name: Build the image
+        run: |
+          unzip -q "release-out/pocketbase-cms_${TAG#v}.zip" -d release-out/files
+          docker build --file release/Dockerfile --tag pocketbase-cms:check release-out/files
+
+      - name: Check COPY --from
+        run: release/verify-image.sh pocketbase-cms:check build
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: release
+          path: release-out/*.zip
+          if-no-files-found: error
+          overwrite: true
           retention-days: 7

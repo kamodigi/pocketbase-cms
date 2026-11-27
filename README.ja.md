@@ -18,6 +18,21 @@
 - 入力欄はコレクションのスキーマから作ります。アプリの隣に置く `cms.config.json` では、表示名・並び順・一覧の列などの見せ方だけを指定します。
 - 小さな PocketBase のフック（JavaScript の `pb_hooks` または Go のパッケージ）が、編集者へのスキーマの公開、保存時のリッチテキストの無害化、内容が変わったときのサイトへの通知を担います。
 
+## 導入
+
+[リリース](https://github.com/kamodigi/pocketbase-cms/releases)は2つの形で配ります。以下の `0.1.0` は使うバージョンに置き換えてください。
+
+**Docker イメージ。** `ghcr.io/kamodigi/pocketbase-cms` の `/dist` に、ビルド済みの CMS が入っています。イメージは起動せず、PocketBase のイメージからファイルを取り出して使います。
+
+```dockerfile
+COPY --from=ghcr.io/kamodigi/pocketbase-cms:0.1.0 /dist /pb/pb_public/cms
+COPY cms.config.json /pb/pb_public/cms/config.json
+```
+
+イメージに入っているのは CMS だけです。[PocketBase のフック](#pocketbase-のフック)は同じバージョンの zip から取るか、Go パッケージを使います。
+
+**zip。** リリースに添付する `pocketbase-cms_0.1.0.zip` には、`cms/`（ビルド済みの CMS）、`pb_hooks/`（JavaScript のフック）、ライセンスが入っています。`cms/` を `pb_public/cms/` に、`pb_hooks/` の中身を自分の `pb_hooks/` に、設定ファイルを `pb_public/cms/config.json` にコピーします。更新するときは、古いバージョンのファイルが残らないように `pb_public/cms/` を丸ごと入れ替えてください。
+
 ## 設定ファイル
 
 CMS は自分と同じフォルダの `config.json` を読み込みます。サイトの `cms.config.json` を `pb_public/cms/config.json` にコピーしてください。
@@ -131,7 +146,7 @@ Authorization: Bearer <token>
 
 ## PocketBase のフック
 
-JavaScript のフックは [`hooks/pb_hooks/`](hooks/pb_hooks) にあります。使うファイルを、読み込む `pbcms/` フォルダと一緒に、自分の PocketBase の `pb_hooks/` にコピーします。
+JavaScript のフックは、リリースの zip の `pb_hooks/`（このリポジトリでは [`hooks/pb_hooks/`](hooks/pb_hooks)）にあります。使うファイルを、読み込む `pbcms/` フォルダと一緒に、自分の PocketBase の `pb_hooks/` にコピーします。
 
 | ファイル                 | 役割                                                                                                                                         |
 | ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -262,6 +277,38 @@ CMS には `editor@example.com` / `password1234` でログインします。Pock
 - `examples/lantern-coffee/cms.config.json` が対応する設定ファイルです。`pb_public/cms/config.json` にコピーします。
 - `examples/lantern-coffee/preview-site/` は、設定の `previewUrl` が指すページです（[サイトでの下書きのプレビュー](#サイトでの下書きのプレビュー)を参照）。
 - どのコレクションにも `created` と `updated`（autodate 型）があります。マイグレーションで作ったコレクションには自動では付かないためです。
+
+## リリース
+
+CMS、JavaScript のフック、Go パッケージのバージョンは1つで、[セマンティックバージョニング](https://semver.org/lang/ja/)に従います。メジャーバージョンが 0 の間は、マイナーリリースで互換性が壊れることがあります（パッチリリースでは壊しません）。更新の前にリリースノートを読んでください。
+
+| 対象            | バージョン 0.1.0 の名前                                        |
+| --------------- | -------------------------------------------------------------- |
+| Git のタグ      | `v0.1.0`（`go get …/pbcms@v0.1.0` もこれを使う）               |
+| Docker イメージ | `ghcr.io/kamodigi/pocketbase-cms:0.1.0`（`latest` は付けない） |
+| リリースの zip  | `pocketbase-cms_0.1.0.zip`                                     |
+
+バージョンを書く場所はタグだけです（`package.json` の `version` は `0.0.0` のままです）。リリースするには、`main` のコミットにタグを打って push します。
+
+```sh
+git fetch origin
+git tag -a v0.1.0 -m v0.1.0 origin/main
+git push origin v0.1.0
+```
+
+[リリースのワークフロー](.github/workflows/release.yml)は、CI をすべて実行してから、イメージ（`linux/amd64` と `linux/arm64`）を push し、zip を添付した GitHub のリリースを作ります。`v0.1.0-rc.1` のように接尾辞の付いたタグはプレリリースになります。公開したタグは動かしたり使い回したりしないでください。Go のモジュールプロキシは、最初に取得した中身を保持します。バージョン 2 には先に `go.mod` のモジュールのパスに `/v2` が必要なので、それまでパッケージ化のスクリプトは受け付けません。
+
+GHCR は新しいパッケージを非公開で作ります。最初のリリースの後に一度だけ、メンテナーが GitHub のパッケージの設定で公開に変えてください。
+
+パッケージ化は手元でも試せます（`zip` が必要です。後半の確認には Docker が必要です）。
+
+```sh
+pnpm build
+release/package.sh v0.0.0-dev   # release-out/pocketbase-cms_0.0.0-dev.zip
+unzip -q release-out/pocketbase-cms_0.0.0-dev.zip -d release-out/files
+docker build -f release/Dockerfile -t pocketbase-cms:check release-out/files
+release/verify-image.sh pocketbase-cms:check build
+```
 
 ## ライセンス
 

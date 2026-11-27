@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"net/http"
 	"os"
-	"path/filepath"
 	"slices"
 	"time"
 
@@ -182,9 +181,10 @@ func isNotified(app core.App, record *core.Record) (bool, error) {
 	if collection.System {
 		return false, nil
 	}
-	names, err := notifiedCollectionNames(app)
+	names, err := managedCollectionNames(app)
 	if err != nil {
-		return false, err
+		// managedCollectionNames has logged why; this is the reason the JavaScript hook logs.
+		return false, errors.New("The CMS config could not be read on the server.")
 	}
 	if !slices.Contains(names, collection.Name) {
 		return false, nil
@@ -193,25 +193,6 @@ func isNotified(app core.App, record *core.Record) (bool, error) {
 		return false, errors.New("PBCMS_NOTIFY_SECRET is not set")
 	}
 	return true, nil
-}
-
-// notifiedCollectionNames returns the names of the collections the CMS manages, read from the
-// config on every call, from the same place as GET /api/cms/schema reads it.
-func notifiedCollectionNames(app core.App) ([]string, error) {
-	configPath := os.Getenv("PBCMS_CONFIG_PATH")
-	if configPath == "" {
-		configPath = filepath.Join(app.DataDir(), "..", "pb_public", "cms", "config.json")
-	}
-	data, err := os.ReadFile(configPath)
-	var names []string
-	if err == nil {
-		names, err = configCollectionNames(data)
-	}
-	if err != nil {
-		app.Logger().Error("pbcms: could not read the CMS config", "path", configPath, "error", err.Error())
-		return nil, errors.New("The CMS config could not be read on the server.")
-	}
-	return names, nil
 }
 
 func logNotifyFailure(e *core.RecordEvent, action string, err error) {

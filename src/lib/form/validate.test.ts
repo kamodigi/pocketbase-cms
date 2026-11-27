@@ -71,6 +71,19 @@ describe('validateField', () => {
 	})
 })
 
+describe('validateField on a relation', () => {
+	const several = { maxSelect: 3, minSelect: 2, type: 'relation' }
+
+	it('counts the records of a relation that holds several', () => {
+		expect(check(several, [])).toBeUndefined()
+		expect(check({ ...several, required: true }, [])).toBe('This field is required.')
+		expect(check(several, ['a'])).toBe('Choose at least 2.')
+		expect(check(several, ['a', 'b'])).toBeUndefined()
+		expect(check(several, ['a', 'b', 'c', 'd'])).toBe('Choose up to 3.')
+		expect(check({ maxSelect: 1, required: true, type: 'relation' }, '')).toBe('This field is required.')
+	})
+})
+
 describe('validateForm', () => {
 	it('skips fields that are not sent', () => {
 		const model = buildFormModel(

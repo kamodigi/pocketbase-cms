@@ -1,14 +1,21 @@
 // The edit screens of the example presets: create, update and delete a store (the list type), write
-// a post (the article type) and edit the single page.
+// a post (the article type), choose its related records and edit the single page.
 import { expect, type Page, test } from '@playwright/test'
 import PocketBase from 'pocketbase'
 
 import { devAccounts } from '../pocketbase'
 
+// A 1x1 transparent PNG.
+const pixel = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=='
+
 async function asEditor(baseURL: string): Promise<PocketBase> {
 	const pb = new PocketBase(baseURL)
 	await pb.collection('users').authWithPassword(devAccounts.editor.email, devAccounts.editor.password)
 	return pb
+}
+
+function draftPrompt(page: Page) {
+	return page.getByRole('region', { name: 'You have unsaved changes. Restore them?' })
 }
 
 async function signIn(page: Page) {
@@ -147,4 +154,145 @@ test('the single page is edited, never created or deleted', async ({ baseURL, pa
 	// There is no new-record screen for it.
 	await page.goto('/cms/#/collections/about/new')
 	await expect(page).toHaveURL(new RegExp(`#/collections/about/${about.id}$`))
+})
+
+test('the cover and the stores of a post are searched, chosen and saved', async ({ baseURL, page }) => {
+	const editor = await asEditor(baseURL!)
+	const tag = uniqueTag()
+	for (const name of ['Pier', 'Market']) {
+		await editor.collection('stores').create({ name: `${name} ${tag}`, region: 'south' })
+	}
+	const file = new File([Buffer.from(pixel, 'base64')], 'pixel.png', { type: 'image/png' })
+	const image = await editor.collection('media').create({ alt: `Cup ${tag}`, file })
+	await signIn(page)
+	await page.getByRole('link', { name: 'New' }).click()
+	await page.getByRole('textbox', { name: /^Title/ }).fill(tag)
+
+	// One record: the cover, chosen from the media collection by its alt text.
+	await page.getByRole('button', { name: 'Choose Cover image' }).click()
+	const covers = page.getByRole('dialog', { name: 'Choose Cover image' })
+	await covers.getByRole('searchbox', { name: 'Search' }).fill(tag)
+	await covers.getByRole('button', { name: `Cup ${tag}` }).click()
+	await expect(covers).toBeHidden()
+
+	// Several records, in the order they are chosen. Enter searches without saving the post.
+	const chooseStores = page.getByRole('button', { name: 'Choose Stores' })
+	await chooseStores.click()
+	const stores = page.getByRole('dialog', { name: 'Choose Stores' })
+	await stores.getByRole('searchbox', { name: 'Search' }).fill(tag)
+	await stores.getByRole('searchbox', { name: 'Search' }).press('Enter')
+	await expect(stores.getByRole('checkbox')).toHaveCount(2)
+	await stores.getByRole('checkbox', { name: `Pier ${tag}` }).check()
+	await stores.getByRole('checkbox', { name: `Market ${tag}` }).check()
+	await expect(stores).toHaveAccessibleDescription('2 of up to 5 chosen')
+	await page.keyboard.press('Escape')
+	await expect(stores).toBeHidden()
+	await expect(chooseStores).toBeFocused()
+
+	await page.getByRole('button', { name: 'Create' }).click()
+	await expect(page.getByText(`Created “${tag}”.`)).toBeVisible()
+	const post = await editor
+		.collection('posts')
+		.getFirstListItem(editor.filter('slug = {:slug}', { slug: tag }), { expand: 'stores' })
+	expect(post.cover).toBe(image.id)
+	expect((post.expand?.stores as { name: string }[]).map(store => store.name)).toEqual([`Pier ${tag}`, `Market ${tag}`])
+
+	// The saved records are named again, and a removal is saved.
+	await page.reload()
+	await expect(page.getByRole('button', { name: `Remove Cup ${tag}` })).toBeVisible()
+	await page.getByRole('button', { name: `Remove Pier ${tag}` }).click()
+	await page.getByRole('button', { name: `Remove Cup ${tag}` }).click()
+	await page.getByRole('button', { name: 'Save' }).click()
+	await expect(page.getByText(`Saved “${tag}”.`)).toBeVisible()
+	const saved = await editor.collection('posts').getOne(post.id)
+	expect(saved.cover).toBe('')
+	expect(saved.stores).toEqual([post.stores[1]])
+})
+
+test('unsaved input survives closing the tab, to be restored or discarded', async ({ baseURL, context, page }) => {
+	const editor = await asEditor(baseURL!)
+	const tag = uniqueTag()
+	const store = await editor
+		.collection('stores')
+		.create({ address: '1 Dock Street', name: `Quay ${tag}`, region: 'south' })
+	const path = `/cms/#/collections/stores/${store.id}`
+	await signIn(page)
+	await page.goto(path)
+	await page.getByRole('textbox', { name: 'Address' }).fill('4 Dock Street')
+	await page.close({ runBeforeUnload: true })
+
+	const second = await context.newPage()
+	await second.goto(path)
+	await expect(draftPrompt(second)).toBeFocused()
+	// The form waits for the choice.
+	await expect(second.locator('form[data-record-form]')).toHaveAttribute('inert')
+	await second.getByRole('button', { name: 'Restore' }).click()
+	await expect(draftPrompt(second)).toBeHidden()
+	const address = second.getByRole('textbox', { name: 'Address' })
+	await expect(address).toHaveValue('4 Dock Street')
+	await second.getByRole('button', { name: 'Save' }).click()
+	await expect(second.getByText(`Saved “Quay ${tag}”.`)).toBeVisible()
+	expect(await editor.collection('stores').getOne(store.id)).toMatchObject({ address: '4 Dock Street' })
+
+	// Saved input is not offered again.
+	await second.reload()
+	await expect(address).toHaveValue('4 Dock Street')
+	await expect(draftPrompt(second)).toBeHidden()
+
+	await address.fill('5 Dock Street')
+	await second.close({ runBeforeUnload: true })
+	const third = await context.newPage()
+	await third.goto(path)
+	await third.getByRole('button', { name: 'Discard' }).click()
+	await expect(third.getByRole('textbox', { name: 'Address' })).toHaveValue('4 Dock Street')
+	await third.reload()
+	await expect(third.getByRole('textbox', { name: 'Address' })).toHaveValue('4 Dock Street')
+	await expect(draftPrompt(third)).toBeHidden()
+
+	// The new-record screen keeps its input too.
+	await third.goto('/cms/#/collections/stores/new')
+	await third.getByRole('textbox', { name: /^Name/ }).fill(`Draft ${tag}`)
+	await third.reload()
+	await third.getByRole('button', { name: 'Restore' }).click()
+	await expect(third.getByRole('textbox', { name: /^Name/ })).toHaveValue(`Draft ${tag}`)
+
+	await editor.collection('stores').delete(store.id)
+})
+
+test('signing out removes the kept input, an expired session keeps it', async ({ baseURL, page }) => {
+	const editor = await asEditor(baseURL!)
+	const tag = uniqueTag()
+	const store = await editor
+		.collection('stores')
+		.create({ address: '1 Dock Street', name: `Mole ${tag}`, region: 'south' })
+	const path = `/cms/#/collections/stores/${store.id}`
+	await signIn(page)
+	await page.goto(path)
+	const address = page.getByRole('textbox', { name: 'Address' })
+	await address.fill('6 Dock Street')
+
+	// A token PocketBase refuses sends the editor to sign in again.
+	await page.evaluate(() => {
+		const auth = JSON.parse(localStorage.getItem('pocketbase_auth')!) as object
+		localStorage.setItem('pocketbase_auth', JSON.stringify({ ...auth, token: 'expired' }))
+	})
+	await page.reload()
+	await expect(page.getByRole('button', { name: 'Sign in' })).toBeVisible()
+	await signIn(page)
+	// Someone else saves the record in the meantime.
+	await editor.collection('stores').update(store.id, { name: `Mole ${tag} 2` })
+	await page.goto(path)
+	await expect(draftPrompt(page)).toContainText('This record was saved again after that.')
+	await page.getByRole('button', { name: 'Restore' }).click()
+	await expect(address).toHaveValue('6 Dock Street')
+	await expect(page.getByRole('textbox', { name: /^Name/ })).toHaveValue(`Mole ${tag} 2`)
+
+	await page.getByRole('button', { name: 'Sign out' }).click()
+	await expect(page.getByRole('button', { name: 'Sign in' })).toBeVisible()
+	await signIn(page)
+	await page.goto(path)
+	await expect(address).toHaveValue('1 Dock Street')
+	await expect(draftPrompt(page)).toBeHidden()
+
+	await editor.collection('stores').delete(store.id)
 })

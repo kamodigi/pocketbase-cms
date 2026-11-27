@@ -18,6 +18,14 @@
 {#if schema && data.cms}
 	<!-- Keyed, so that the inputs of one record never carry over to another. -->
 	{#key `${collection}/${id}`}
-		<RecordForm {collection} config={data.cms} {label} record={data.record} {schema} uiLocale={getLocale()} />
+		<RecordForm
+			{collection}
+			collections={data.schema}
+			config={data.cms}
+			{label}
+			record={data.record}
+			{schema}
+			uiLocale={getLocale()}
+		/>
 	{/key}
 {/if}

@@ -18,18 +18,23 @@
 			"label": "Posts",
 			"icon": "newspaper",
 			"titleField": "title",
+			"previewUrl": "http://127.0.0.1:3001/preview",
 			"status": { "draftField": "draft", "publishedAtField": "published_at" },
 			"list": {
 				"columns": ["title", "category", "$status", "published_at", "updated"],
 				"sort": "-published_at",
 				"perPage": 20
 			},
-			"form": { "main": ["title", "body"], "side": ["slug", "category", "published_at", "draft", "pinned", "cover"] },
+			"form": {
+				"main": ["title", "body"],
+				"side": ["slug", "category", "published_at", "draft", "pinned", "cover", "stores"]
+			},
 			"fields": {
 				"title": { "label": "Title" },
 				"slug": { "label": "Slug", "widget": "slug", "slugFrom": "title" },
 				"body": { "label": "Body" },
 				"cover": { "label": "Cover image", "widget": "media" },
+				"stores": { "label": "Stores", "displayField": "name" },
 				"category": { "label": "Category", "options": { "news": "News", "event": "Event", "journal": "Journal" } },
 				"pinned": { "label": "Pinned", "badge": "Pinned", "help": "Shown at the top of the list on the site." },
 				"draft": { "label": "Draft" },
@@ -81,6 +86,7 @@
 			"label": "About page",
 			"icon": "info",
 			"singleton": true,
+			"previewUrl": "http://127.0.0.1:3001/preview",
 			"titleField": "title",
 			"fields": {
 				"title": { "label": "Title" },

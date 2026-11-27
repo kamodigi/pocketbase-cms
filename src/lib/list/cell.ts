@@ -1,10 +1,11 @@
 import type PocketBase from 'pocketbase'
 import type { RecordModel } from 'pocketbase'
 
-import { type CmsConfig, localizedFieldName, resolveLabel, type SchemaCollection } from '#lib/config/index.js'
+import { type CmsConfig, resolveLabel, type SchemaCollection } from '#lib/config/index.js'
+import { nameKeys, recordName } from '#lib/relation/name.js'
 import { m } from '#paraglide/messages.js'
 
-import { type Column, type ListModel, titleFieldName } from './model'
+import { type Column, type ListModel } from './model'
 import { type PublishState } from './query'
 import { parseDate, publishState } from './request'
 
@@ -134,20 +135,6 @@ function listOf(value: unknown): string[] {
 	return (Array.isArray(value) ? value : [value]).filter(item => item !== '').map(String)
 }
 
-function relatedName(column: Column, related: RecordModel, { config, schema }: CellContext): string {
-	const target = schema.find(collection => collection.name === related.collectionName)
-	const titleKey = target && titleFieldName(config, target)
-	const baseLocale = config.locales?.[0]
-	// The collection may be outside the CMS (such as users), so common name fields are tried too.
-	const candidates = [column.config?.displayField, titleKey, 'name', 'title', 'email']
-	for (const key of candidates) {
-		if (key === undefined) continue
-		const value: unknown = related[key] || (baseLocale && related[localizedFieldName(key, baseLocale)])
-		if (typeof value === 'string' && value !== '') return value
-	}
-	return related.id
-}
-
 /**
 Related records are shown by name; a record of the media library by its image. One that PocketBase
 did not expand (its view rule refuses the editor) is shown by its id.
@@ -174,7 +161,12 @@ function relationCell(column: Column, record: RecordModel, context: CellContext)
 		}
 	}
 
-	return text(related.map(item => relatedName(column, item, context)).join(', '))
+	const { config, schema } = context
+	const name = (item: RecordModel) => {
+		const target = schema.find(collection => collection.name === item.collectionName)
+		return recordName(item, nameKeys(config, target, column.config?.displayField), config.locales?.[0])
+	}
+	return text(related.map(item => name(item)).join(', '))
 }
 
 function shorten(value: string): string {

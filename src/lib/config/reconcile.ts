@@ -20,6 +20,10 @@ The part of a PocketBase collection definition that the config is checked agains
 */
 export interface SchemaCollection {
 	fields: SchemaField[]
+	/**
+	What a relation field's `collectionId` points at.
+	*/
+	id?: string
 	name: string
 }
 
@@ -27,6 +31,10 @@ export interface SchemaCollection {
 A field definition as PocketBase returns it. Only the properties the CMS reads are listed.
 */
 export interface SchemaField {
+	/**
+	For relation fields: the id of the related collection.
+	*/
+	collectionId?: string
 	/**
 	For url fields: the only domains allowed, or the domains refused.
 	*/
@@ -41,13 +49,17 @@ export interface SchemaField {
 	*/
 	max?: null | number | string
 	/**
-	For select fields: up to how many values can be chosen; 0 or 1 means one.
+	For select and relation fields: up to how many values can be chosen; 0 or 1 means one.
 	*/
 	maxSelect?: number
 	/**
 	Like `max`, the shortest length, smallest value or earliest date.
 	*/
 	min?: null | number | string
+	/**
+	For relation fields with several values: at least how many must be chosen, unless none is.
+	*/
+	minSelect?: number
 	name: string
 	onlyDomains?: null | string[]
 	/**
@@ -95,6 +107,11 @@ export function reconcileConfig(source: CmsConfig, schema: SchemaCollection[]): 
 			warnings.push(issue(['collections', name], `the PocketBase schema has no collection "${name}"; ignored`))
 			delete config.collections[name]
 		}
+	}
+
+	// After every collection's own fields were checked, so that localized base names are final.
+	for (const [name, collection] of Object.entries(config.collections)) {
+		reconcileDisplayFields(config, name, collection, schemaByName, warnings)
 	}
 
 	if (config.nav) {
@@ -269,6 +286,41 @@ function reconcileCollection(
 			if (kept === undefined) delete collection.form[area]
 			else collection.form[area] = kept
 		}
+	}
+}
+
+/**
+Drops a `displayField` that the related collection does not have. A relation to a collection outside
+the CMS (such as users) is left as it is: its fields are not in the schema.
+*/
+function reconcileDisplayFields(
+	config: CmsConfig,
+	name: string,
+	collection: CollectionConfig,
+	schemaByName: Map<string, SchemaCollection>,
+	warnings: ConfigIssue[],
+): void {
+	const locales = config.locales ?? []
+	const fieldConfigs = Object.entries(collection.fields ?? {})
+	for (const [field, fieldConfig] of fieldConfigs) {
+		const { displayField } = fieldConfig
+		if (displayField === undefined) continue
+		// A localized base name stands for its fields of every locale.
+		const names = fieldConfig.localized ? locales.map(locale => localizedFieldName(field, locale)) : [field]
+		const targetId = schemaByName
+			.get(name)
+			?.fields.find(item => names.includes(item.name) && item.type === 'relation')?.collectionId
+		const target = schemaByName.values().find(item => item.id !== undefined && item.id === targetId)
+		if (!target) continue
+		const isLocalized = config.collections[target.name]?.fields?.[displayField]?.localized
+		if (isLocalized || fieldNameSet(target).has(displayField)) continue
+		warnings.push(
+			issue(
+				['collections', name, 'fields', field, 'displayField'],
+				`the PocketBase collection "${target.name}" has no field "${displayField}"; ignored`,
+			),
+		)
+		delete fieldConfig.displayField
 	}
 }
 

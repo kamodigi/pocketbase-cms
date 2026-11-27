@@ -65,6 +65,67 @@ For content in several languages, list the content locales in `locales` (the fir
 
 The edit screen shows such a field as one input with a tab per locale. The tabs of all localized inputs switch together, and the base locale opens first. Whether a locale must be filled in follows that field's `required` in PocketBase; when saving is refused, the CMS opens the locale of the first field with an error, and marks the tabs that have one. A locale in `locales` without its field in the schema is reported as a warning, and the input shows only the locales that exist. Shared values such as the slug, dates, images and the publish state are ordinary fields, so a record is published in every language at once. A slug made from a localized title uses the base locale. The language of the CMS itself is chosen separately (see the language menu) and does not change the open tab.
 
+### Relation fields
+
+On the edit screen, a `relation` field shows the chosen records by name. "Choose …" opens a dialog that searches the related collection and picks one record, or several when the field's `maxSelect` is more than 1; several are saved in the order they were chosen.
+
+- **Name**: the field's `displayField`, or else the related collection's `titleField` (or first text field), or else its `name`, `title` or `email`. A record with none of these, or one that PocketBase does not show to the editor, appears as its id.
+- **Search** matches that name field and the related collection's `list.search`. Records are in its `list.sort` order.
+- **Collections outside the config** (such as `users`) work too. PocketBase's list and view rules decide which of their records an editor can choose, and their names are read from `displayField`, `name`, `title` or `email`.
+
+### Unsaved input
+
+While you type on an edit screen, the CMS keeps the changed fields in the browser's local storage, one draft per editor and record (the new-record screen has one per collection). Opening that screen again asks "You have unsaved changes. Restore them?"; the form can be used once you choose to restore or discard. A restore puts back only the changed fields and sends nothing until you save. The draft is removed when you save or delete the record, discard it, or undo the changes yourself. Signing out with the sign-out button removes all of that editor's drafts, so a shared computer keeps no unpublished text. A session that expires keeps them, so no input is lost. If the record has an `updated` field and was saved again after the draft was made, the question says so; you can still restore. If the browser's storage is full or blocked, the screens work without drafts.
+
+### Draft previews on your site
+
+Give a collection a `previewUrl`, the absolute `http` or `https` address of a page on your site, and the edit screen of its saved records gets a **Preview on site** button:
+
+```json
+{
+	"collections": {
+		"news": { "previewUrl": "https://www.example.com/news/preview" }
+	}
+}
+```
+
+A collection without `previewUrl` has no button. It needs the preview hook, `pbcms_preview.pb.js` (see [PocketBase hooks](#pocketbase-hooks)), or the [Go package](#go-package). There is no helper library: your site implements the page from the description below.
+
+**What your page receives.** The button opens a new tab and submits an HTML form to `previewUrl`: a `POST` with an `application/x-www-form-urlencoded` body.
+
+| Field        | Value                                                     |
+| ------------ | --------------------------------------------------------- |
+| `collection` | The collection's name, such as `news`                     |
+| `id`         | The record's id                                           |
+| `token`      | A preview token for this one record, valid for 10 minutes |
+
+The values are those of the saved record: changes not saved yet are not shown. More fields may be added later, so ignore the ones you don't know.
+
+**How your page reads the draft.** Call PocketBase with the token:
+
+```http
+GET https://pb.example.com/api/cms/preview/news/abc123def456ghi
+Authorization: Bearer <token>
+```
+
+| Status | Meaning                                                                                           |
+| ------ | ------------------------------------------------------------------------------------------------- |
+| 200    | The record as PocketBase's record API returns it, drafts included, with `Cache-Control: no-store` |
+| 401    | The token is missing, invalid or expired. Ask the editor to open the preview from the CMS again   |
+| 403    | The token is for another record                                                                   |
+| 404    | The record has been deleted                                                                       |
+
+Relations come as ids. To show related records, read them from PocketBase's record API as your public pages do; the token does not open anything but its one record.
+
+**What your page should do.**
+
+- Accept a cross-origin form `POST`. Many frameworks refuse one by default as CSRF protection, so allow the CMS's origin or exempt this route. Cookies marked `SameSite=Lax` or `Strict` are not sent with it.
+- Treat the fields as untrusted input, because anyone can send this form: accept only the collections you have a page for, check the id's format, and always call your own PocketBase, never an address taken from the request.
+- Serve the page over HTTPS, keep the token out of URLs and logs, and don't cache or index the page (`Cache-Control: no-store`, `noindex`).
+- Show rich text only with the hooks that sanitize it installed (see below).
+
+[`examples/lantern-coffee/preview-site/server.mjs`](examples/lantern-coffee/preview-site/server.mjs) is a small page that does this, with no dependencies. The example config points `posts` and `about` at it, so with the [development PocketBase](#try-it-with-a-development-pocketbase) running, start it with `node examples/lantern-coffee/preview-site/server.mjs` and press the button. In your own site's config, change or remove those `previewUrl`s.
+
 ## PocketBase hooks
 
 The JavaScript hooks live in [`hooks/pb_hooks/`](hooks/pb_hooks). Copy the files you need, together with the `pbcms/` folder they load, into your PocketBase's `pb_hooks/`.
@@ -126,7 +187,11 @@ app := pocketbase.New()
 pbcms.Register(app)
 ```
 
-`pbcms.Register` adds `GET /api/cms/schema`, with the same answers, the same checks and the same `PBCMS_CONFIG_PATH` as `pbcms_schema.pb.js`; don't install that hook as well. The other hooks are not in the package yet: until they are, register PocketBase's `jsvm` plugin and keep `pbcms_sanitize.pb.js`, `pbcms_media_urls.pb.js`, `pbcms_preview.pb.js` and `pbcms_notify.pb.js` in `pb_hooks/`, with the `pbcms/` folder they load, as [`tests/gopocketbase/main.go`](tests/gopocketbase/main.go) does.
+`pbcms.Register` replaces all the JavaScript hooks above, so don't install them as well. It reads the same environment variables (`PBCMS_CONFIG_PATH`, `PBCMS_PUBLIC_URL`, `PBCMS_PREVIEW_TOKEN_DURATION`, `PBCMS_NOTIFY_URL`, `PBCMS_NOTIFY_SECRET`):
+
+- It adds `GET /api/cms/schema` and the preview routes (`POST /api/cms/preview/{collection}/{id}/token` and `GET /api/cms/preview/{collection}/{id}`), with the same answers and the same checks. Preview tokens are the same in both, so one issued by the JavaScript hook works with the Go package and the other way round.
+- It notifies your site with the same request as `pbcms_notify.pb.js`.
+- It sanitizes `editor` fields on save with the same allowlist, and sanitizes them again in responses with image URLs looked up afresh. The Go sanitizer is a port of `hooks/pb_hooks/pbcms/html.cjs`; its tests run both on the same inputs and check that the output is the same.
 
 ## Development
 
@@ -184,7 +249,7 @@ Sign in at the CMS with `editor@example.com` / `password1234`. The PocketBase da
 
 | Collection | Type        | Notes                                                                                                                    |
 | ---------- | ----------- | ------------------------------------------------------------------------------------------------------------------------ |
-| `posts`    | Article     | Title, slug, rich text body, cover image, category, draft flag and publish date                                          |
+| `posts`    | Article     | Title, slug, rich text body, cover image, category, stores, draft flag and publish date                                  |
 | `events`   | Article     | The article type in three languages (`en`, `ja`, `zh-Hans`): localized title and body, shared slug, dates and draft flag |
 | `stores`   | List        | Flat records with a select field and a URL                                                                               |
 | `about`    | Single page | One record, created by the migration; editors can update it but not create or delete it                                  |
@@ -192,6 +257,7 @@ Sign in at the CMS with `editor@example.com` / `password1234`. The PocketBase da
 
 - `examples/lantern-coffee/pb_migrations/` holds the JavaScript migrations, including `users.role`. Put them in your PocketBase's `pb_migrations/`.
 - `examples/lantern-coffee/cms.config.json` is the matching config. Copy it to `pb_public/cms/config.json`.
+- `examples/lantern-coffee/preview-site/` is the page the config's `previewUrl` points at (see [Draft previews on your site](#draft-previews-on-your-site)).
 - Every collection has `created` and `updated` (autodate) fields. Collections made by migrations don't get them automatically.
 
 ## License

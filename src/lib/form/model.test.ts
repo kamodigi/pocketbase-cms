@@ -168,5 +168,7 @@ describe('inputKind', () => {
 		expect(inputKind({ name: 'a', type: 'bool' }, undefined)).toBe('toggle')
 		expect(inputKind({ maxSelect: 2, name: 'a', type: 'select' }, { widget: 'select' })).toBe('checkboxes')
 		expect(inputKind({ name: 'a', type: 'file' }, undefined)).toBe('pending')
+		expect(inputKind({ maxSelect: 1, name: 'a', type: 'relation' }, { widget: 'media' })).toBe('relation')
+		expect(inputKind({ maxSelect: 3, name: 'a', type: 'relation' }, undefined)).toBe('relations')
 	})
 })

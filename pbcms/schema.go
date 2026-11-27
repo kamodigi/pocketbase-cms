@@ -6,8 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"os"
-	"path/filepath"
 
 	"ganigeorgiev.com/pocketbase/pocketbase/core"
 )
@@ -39,29 +37,18 @@ func schemaHandler(e *core.RequestEvent) error {
 	if e.Auth == nil {
 		return e.UnauthorizedError("Sign in as an editor.", nil)
 	}
-	if e.Auth.Collection().Name != "users" || e.Auth.GetString("role") != "editor" {
+	if !isEditor(e.Auth) {
 		return e.ForbiddenError("Only editors can read the CMS schema.", nil)
 	}
-
-	configPath := os.Getenv("PBCMS_CONFIG_PATH")
-	if configPath == "" {
-		configPath = filepath.Join(e.App.DataDir(), "..", "pb_public", "cms", "config.json")
-	}
-	data, err := os.ReadFile(configPath)
-	var names []string
-	if err == nil {
-		names, err = configCollectionNames(data)
-	}
+	names, err := managedCollectionNames(e.App)
 	if err != nil {
-		e.App.Logger().Error("pbcms: could not read the CMS config", "path", configPath, "error", err.Error())
-		return e.InternalServerError("The CMS config could not be read on the server.", nil)
+		return configError(e)
 	}
 
 	collections := []schemaCollection{}
 	for _, name := range names {
-		collection, err := e.App.FindCachedCollectionByNameOrId(name)
-		// Only by name: an id in the config is not a name the CMS can match.
-		if err != nil || collection.Name != name || collection.System {
+		collection := findManagedCollection(e.App, names, name)
+		if collection == nil {
 			continue
 		}
 		fields := core.FieldsList{}

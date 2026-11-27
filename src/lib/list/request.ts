@@ -8,7 +8,11 @@ import type { ListQuery, PublishState } from './query'
 /**
 The PocketBase filter for a search and a publish state; empty when there is neither.
 */
-export function listFilter(pb: PocketBase, model: ListModel, { search, status }: ListQuery): string {
+export function listFilter(
+	pb: PocketBase,
+	model: Pick<ListModel, 'searchFields' | 'status'>,
+	{ search, status }: Pick<ListQuery, 'search' | 'status'>,
+): string {
 	const filters: string[] = []
 	if (search !== '' && model.searchFields.length > 0) {
 		// PocketBase takes a value with a "%" of its own as a LIKE pattern. The pattern is written here, with
@@ -25,7 +29,7 @@ export function listFilter(pb: PocketBase, model: ListModel, { search, status }:
 The order of the list: the user's choice or the default, with the id last so that records with equal
 values keep their place from one page to the next.
 */
-export function listSort(model: ListModel, { sort }: ListQuery): string {
+export function listSort(model: Pick<ListModel, 'defaultSort'>, { sort }: Pick<ListQuery, 'sort'>): string {
 	const terms = (sort || model.defaultSort).split(',').filter(term => term !== '')
 	if (terms.every(term => !term.startsWith('@') && !/^[+-]?id$/.test(term))) terms.push('id')
 	return terms.join(',')

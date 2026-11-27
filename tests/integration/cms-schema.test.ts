@@ -61,6 +61,7 @@ describe('GET /api/cms/schema', () => {
 				'published_at',
 				'created',
 				'updated',
+				'stores',
 			])
 			expect(posts.fields.find(f => f.name === 'category')).toMatchObject({
 				maxSelect: 1,

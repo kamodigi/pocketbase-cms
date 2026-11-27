@@ -173,7 +173,11 @@ app := pocketbase.New()
 pbcms.Register(app)
 ```
 
-`pbcms.Register` は `GET /api/cms/schema` とプレビューのルート（`POST /api/cms/preview/{collection}/{id}/token` と `GET /api/cms/preview/{collection}/{id}`）を追加し、`pbcms_notify.pb.js` と同じようにサイトへ通知します。応答・権限の判定・環境変数（`PBCMS_CONFIG_PATH`・`PBCMS_PREVIEW_TOKEN_DURATION`）の扱いは `pbcms_schema.pb.js`・`pbcms_preview.pb.js` と、送る内容と `PBCMS_NOTIFY_URL`・`PBCMS_NOTIFY_SECRET` の扱いは `pbcms_notify.pb.js` と同じなので、これらのフックは一緒に入れないでください。プレビュー用トークンも同じものなので、JavaScript のフックが発行したトークンは Go パッケージでも使え、その逆も使えます。ほかのフックはまだパッケージにありません。それまでは、[`tests/gopocketbase/main.go`](tests/gopocketbase/main.go) と同じように PocketBase の `jsvm` プラグインを登録し、`pbcms_sanitize.pb.js`・`pbcms_media_urls.pb.js` を、それらが読み込む `pbcms/` フォルダと一緒に `pb_hooks/` に置いてください。
+`pbcms.Register` は上の JavaScript のフックすべての代わりになるので、フックは一緒に入れないでください。読み取る環境変数（`PBCMS_CONFIG_PATH`・`PBCMS_PUBLIC_URL`・`PBCMS_PREVIEW_TOKEN_DURATION`・`PBCMS_NOTIFY_URL`・`PBCMS_NOTIFY_SECRET`）も同じです。
+
+- `GET /api/cms/schema` とプレビューのルート（`POST /api/cms/preview/{collection}/{id}/token` と `GET /api/cms/preview/{collection}/{id}`）を追加します。応答と権限の判定は同じです。プレビュー用トークンも同じものなので、JavaScript のフックが発行したトークンは Go パッケージでも使え、その逆も使えます。
+- サイトへは `pbcms_notify.pb.js` と同じ内容を通知します。
+- 保存時に同じ許可リストで `editor` 型の項目を無害化し、応答でもう一度無害化して画像の URL を引き直します。Go のサニタイザーは `hooks/pb_hooks/pbcms/html.cjs` を移植したもので、テストで両方に同じ入力を与えて出力が同じことを確かめています。
 
 ## 開発
 

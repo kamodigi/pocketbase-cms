@@ -5,6 +5,9 @@
 // tokenized here by hand. The sanitizer never passes input through: it re-serializes the tokens it
 // keeps, escaping every text run and attribute value, and closes every tag it opens.
 // Load it inside a handler with require(`${__hooks}/pbcms/html.cjs`).
+//
+// pbcms/html.go is a Go port with the same allowlist and output; its tests run this file and
+// compare. Change the two together.
 
 'use strict'
 

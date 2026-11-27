@@ -13,7 +13,10 @@ describe('the PocketBase version', () => {
 		const version = /PB_VERSION:\s*([\d.]+)/.exec(await read('compose.yaml'))?.[1]
 		expect(version).toMatch(/^\d+\.\d+\.\d+$/)
 
-		const goModule = /^require ganigeorgiev\.com\/pocketbase\/pocketbase v(\S+)$/m.exec(await read('go.mod'))?.[1]
+		// A single `require` line, or a line in a `require ( … )` block.
+		const goModule = /^(?:require )?\s*ganigeorgiev\.com\/pocketbase\/pocketbase v(\S+)$/m.exec(
+			await read('go.mod'),
+		)?.[1]
 		expect(goModule).toBe(version)
 
 		for (const readme of ['README.md', 'README.ja.md']) {

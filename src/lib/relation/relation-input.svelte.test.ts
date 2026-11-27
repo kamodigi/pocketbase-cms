@@ -59,11 +59,12 @@ function serve({ fail = false } = {}) {
 		if (fail) return Response.json({ message: 'Something broke.' }, { status: 500 })
 		const filter = url.searchParams.get('filter') ?? ''
 		const search = /name ~ "%(.*)%"/.exec(filter)?.[1]
-		const found = filter.includes('id = ')
-			? stores.filter(store => filter.includes(`"${store.id}"`))
-			: stores.filter(store => search === undefined || store.name.includes(search))
+		const isById = filter.includes('id = ')
+		const found = stores.filter(store =>
+			isById ? filter.includes(`"${store.id}"`) : search === undefined || store.name.includes(search),
+		)
 		const page = Number(url.searchParams.get('page'))
-		const perPage = filter.includes('id = ') ? found.length : 2
+		const perPage = isById ? found.length : 2
 		return Response.json({
 			items: found.slice((page - 1) * perPage, page * perPage),
 			page,

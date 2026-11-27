@@ -59,6 +59,10 @@ A collection's screen is a table of its records.
 
 The page, search, filter and sort are kept in the URL, so reloading and going back keep them. A localized field shows, searches and sorts the first locale in `locales`. A collection with `singleton: true` has no list: the CMS opens its one record.
 
+### Unsaved input
+
+While you type on an edit screen, the CMS keeps the changed fields in the browser's local storage, one draft per editor and record (the new-record screen has one per collection). Opening that screen again asks "You have unsaved changes. Restore them?"; the form can be used once you choose to restore or discard. A restore puts back only the changed fields and sends nothing until you save. The draft is removed when you save or delete the record, discard it, or undo the changes yourself. Signing out with the sign-out button removes all of that editor's drafts, so a shared computer keeps no unpublished text. A session that expires keeps them, so no input is lost. If the record has an `updated` field and was saved again after the draft was made, the question says so; you can still restore. If the browser's storage is full or blocked, the screens work without drafts.
+
 ### Draft previews on your site
 
 Give a collection a `previewUrl`, the absolute `http` or `https` address of a page on your site, and the edit screen of its saved records gets a **Preview on site** button:

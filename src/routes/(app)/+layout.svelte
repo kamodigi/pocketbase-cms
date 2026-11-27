@@ -10,6 +10,7 @@
 	import { Button } from '#lib/components/ui/button/index.js'
 	import ConfigIssues from '#lib/config/config-issues.svelte'
 	import { resolveLabel } from '#lib/config/index.js'
+	import { removeUserDrafts } from '#lib/form/draft.js'
 	import AppShell from '#lib/layout/app-shell.svelte'
 	import { buildNav } from '#lib/nav/build-nav.js'
 	import { pb } from '#lib/pocketbase.js'
@@ -44,8 +45,10 @@
 		}),
 	)
 
-	// The auth store listener above takes the user to the sign-in screen.
+	// The auth store listener above takes the user to the sign-in screen. Only signing out by choice
+	// removes the unsaved input: an expired session must not lose it.
 	function handleSignOut() {
+		if (user) removeUserDrafts(user.id)
 		signOut(pb)
 	}
 </script>

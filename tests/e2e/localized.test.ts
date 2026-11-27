@@ -33,7 +33,12 @@ test('an event is written in each locale by switching tabs, and saved', async ({
 
 	const titleTabs = page.getByRole('tablist', { name: 'Language of Title' })
 	const bodyTabs = page.getByRole('tablist', { name: 'Language of Body' })
-	await expect(titleTabs.getByRole('tab')).toHaveText(['English', 'Japanese', 'Simplified Chinese'])
+	// Nothing is written yet, so every tab is marked.
+	await expect(titleTabs.getByRole('tab')).toHaveText([
+		/^English\s+Empty\s*$/,
+		/^Japanese\s+Empty\s*$/,
+		/Chinese\s+Empty\s*$/,
+	])
 	// The base locale is open first.
 	await expect(titleTabs.getByRole('tab', { name: 'English' })).toHaveAttribute('aria-selected', 'true')
 	const title = page.getByRole('textbox', { name: /^Title/ })
@@ -74,16 +79,41 @@ test('an event is written in each locale by switching tabs, and saved', async ({
 		title_zh_hans: `杯测之夜 ${tag}`,
 	})
 
-	// The saved values come back in their own tabs.
+	// The saved values come back in their own tabs, and no tab of a written locale is marked.
 	await page.reload()
+	await expect(titleTabs.getByRole('tab')).toHaveText(['English', 'Japanese', 'Simplified Chinese'])
+	await expect(bodyTabs.getByRole('tab')).toHaveText(['English', /^Japanese\s+Empty\s*$/, 'Simplified Chinese'])
 	await expect(title).toHaveValue(`Cupping night ${tag}`)
 	await titleTabs.getByRole('tab', { name: 'Japanese' }).click()
 	await expect(title).toHaveValue(`カッピングの夜 ${tag}`)
 	await body.fill('<p>桟橋で。</p>')
+	await expect(bodyTabs.getByRole('tab', { name: 'Japanese' })).toHaveText('Japanese')
 	await page.getByRole('button', { name: 'Save' }).click()
 	await expect(page.getByText(`Saved “Cupping night ${tag}”.`)).toBeVisible()
 	expect(await editor.collection('events').getOne(id!)).toMatchObject({
 		body_en: '<p>At the pier.</p>',
 		body_ja: '<p>桟橋で。</p>',
 	})
+})
+
+test('the list shows the base locale, and a tab of a missing translation is marked', async ({ baseURL, page }) => {
+	const editor = await asEditor(baseURL!)
+	const tag = uniqueTag()
+	const event = await editor.collection('events').create({
+		slug: tag,
+		title_en: `Roasting class ${tag}`,
+		title_ja: `焙煎教室 ${tag}`,
+	})
+	await signIn(page)
+	await page.goto('/cms/#/collections/events')
+	await page.getByRole('searchbox', { name: 'Search' }).fill(tag)
+	const rows = page.getByRole('table', { name: 'Events' }).locator('tbody tr')
+	await expect(rows).toHaveCount(1)
+	await expect(rows.getByRole('link')).toHaveText(`Roasting class ${tag}`)
+	await expect(rows).not.toContainText('焙煎教室')
+
+	await rows.getByRole('link').click()
+	const titleTabs = page.getByRole('tablist', { name: 'Language of Title' })
+	await expect(titleTabs.getByRole('tab')).toHaveText(['English', 'Japanese', /Chinese\s+Empty\s*$/])
+	await editor.collection('events').delete(event.id)
 })

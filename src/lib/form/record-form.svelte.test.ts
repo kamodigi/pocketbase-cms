@@ -396,6 +396,10 @@ describe('RecordForm', () => {
 	})
 })
 
+function localeTab(field: string, name: RegExp) {
+	return within(screen.getByRole('tablist', { name: `Language of ${field}` })).getByRole('tab', { name })
+}
+
 describe('RecordForm with localized fields', () => {
 	const localizedConfig: CmsConfig = {
 		collections: {
@@ -439,11 +443,11 @@ describe('RecordForm with localized fields', () => {
 		showLocalized()
 		const titleTabs = screen.getByRole('tablist', { name: 'Language of Title' })
 		expect(screen.getByRole('tablist', { name: 'Language of Body' })).toBeInTheDocument()
-		expect(screen.getAllByRole('tab').map(tab => tab.textContent?.trim())).toEqual([
-			'Japanese',
-			'English',
-			'Japanese',
-			'English',
+		expect(screen.getAllByRole('tab').map(tab => tab.textContent?.replaceAll(/\s+/g, ' ').trim())).toEqual([
+			'Japanese Empty',
+			'English Empty',
+			'Japanese Empty',
+			'English Empty',
 		])
 		// The base locale is open first, and only its input is shown.
 		expect(screen.getAllByRole('textbox', { name: /^Title/ })).toHaveLength(1)
@@ -451,14 +455,60 @@ describe('RecordForm with localized fields', () => {
 		// The slug is made from the base locale.
 		expect(screen.getByRole('textbox', { name: /^Slug/ })).toHaveValue('fuyu')
 
-		await user.click(within(titleTabs).getByRole('tab', { name: 'English' }))
+		await user.click(within(titleTabs).getByRole('tab', { name: /^English/ }))
 		const english = screen.getByRole('textbox', { name: /^Title/ })
 		expect(english).toHaveValue('')
 		expect(english.closest('[role="tabpanel"]')).toHaveAttribute('lang', 'en')
 		// Body follows the open locale too.
 		expect(
-			within(screen.getByRole('tablist', { name: 'Language of Body' })).getByRole('tab', { name: 'English' }),
+			within(screen.getByRole('tablist', { name: 'Language of Body' })).getByRole('tab', { name: /^English/ }),
 		).toHaveAttribute('aria-selected', 'true')
+	})
+
+	it('asks for the preview in the locale of the open tab', async () => {
+		const user = userEvent.setup()
+		serve(200, { token: 'a.b.c' })
+		const tab = { close: vi.fn(), closed: false, document: document.implementation.createHTMLDocument() }
+		const open = vi.spyOn(globalThis, 'open').mockReturnValue(tab as unknown as Window)
+		const submit = vi.spyOn(HTMLFormElement.prototype, 'submit').mockImplementation(() => {})
+		render(RecordForm, {
+			collection: 'pages',
+			config: {
+				...localizedConfig,
+				collections: { pages: { ...localizedConfig.collections.pages, previewUrl: 'https://example.com/preview' } },
+			},
+			label: 'Pages',
+			record: { collectionName: 'pages', id: 'p1', title_en: 'Winter', title_ja: 'Fuyu' } as unknown as RecordModel,
+			schema: localizedSchema,
+			uiLocale: 'en',
+		})
+		const sentLocale = async () => {
+			tab.document.body.replaceChildren()
+			await user.click(screen.getByRole('button', { name: 'Preview on site' }))
+			return waitFor(() => tab.document.querySelector<HTMLInputElement>('input[name="locale"]')!.value)
+		}
+
+		await expect(sentLocale()).resolves.toBe('ja')
+		await user.click(
+			within(screen.getByRole('tablist', { name: 'Language of Body' })).getByRole('tab', { name: /^English/ }),
+		)
+		await expect(sentLocale()).resolves.toBe('en')
+		open.mockRestore()
+		submit.mockRestore()
+	})
+
+	it('marks the tab of each locale that is still empty, field by field', async () => {
+		const user = userEvent.setup()
+		showLocalized()
+		const title = screen.getByRole('textbox', { name: /^Title/ })
+
+		await user.type(title, 'Fuyu')
+		expect(localeTab('Title', /^Japanese/)).not.toHaveTextContent('Empty')
+		expect(localeTab('Title', /^English/)).toHaveTextContent('Empty')
+		expect(localeTab('Body', /^Japanese/)).toHaveTextContent('Empty')
+
+		await user.clear(title)
+		expect(localeTab('Title', /^Japanese/)).toHaveTextContent('Empty')
 	})
 
 	it('opens the locale of the first field with an error, and marks its tab', async () => {

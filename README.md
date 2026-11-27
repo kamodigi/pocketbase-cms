@@ -63,7 +63,7 @@ The page, search, filter and sort are kept in the URL, so reloading and going ba
 
 For content in several languages, list the content locales in `locales` (the first is the base locale) and keep one PocketBase field per locale, named `<name>_<locale>`: `title_en`, `title_ja`. A locale with a hyphen is written in lower case with an underscore, so `zh-Hans` becomes `title_zh_hans`. Then set `"localized": true` on the base name in `fields` (`"title": { "localized": true }`) and use the base name everywhere else in the config, such as in `titleField`, `form` and `list`.
 
-The edit screen shows such a field as one input with a tab per locale. The tabs of all localized inputs switch together, and the base locale opens first. Whether a locale must be filled in follows that field's `required` in PocketBase; when saving is refused, the CMS opens the locale of the first field with an error, and marks the tabs that have one. A locale in `locales` without its field in the schema is reported as a warning, and the input shows only the locales that exist. Shared values such as the slug, dates, images and the publish state are ordinary fields, so a record is published in every language at once. A slug made from a localized title uses the base locale. The language of the CMS itself is chosen separately (see the language menu) and does not change the open tab.
+The edit screen shows such a field as one input with a tab per locale. The tabs of all localized inputs switch together, and the base locale opens first. The tab of a locale whose field is still empty is marked **Empty**; rich text with nothing but empty paragraphs counts as empty, and a switch (`bool`) is never marked. Whether a locale must be filled in follows that field's `required` in PocketBase; when saving is refused, the CMS opens the locale of the first field with an error, and marks the tabs that have one. A locale in `locales` without its field in the schema is reported as a warning, and the input shows only the locales that exist. Shared values such as the slug, dates, images and the publish state are ordinary fields, so a record is published in every language at once. A slug made from a localized title uses the base locale. The language of the CMS itself is chosen separately (see the language menu) and does not change the open tab.
 
 ### Relation fields
 
@@ -98,6 +98,9 @@ A collection without `previewUrl` has no button. It needs the preview hook, `pbc
 | `collection` | The collection's name, such as `news`                     |
 | `id`         | The record's id                                           |
 | `token`      | A preview token for this one record, valid for 10 minutes |
+| `locale`     | The content locale of the open tab, such as `zh-Hans`     |
+
+`locale` is sent only when the edit screen has [localized fields](#localized-content). It is written as in `locales`, and says which language the editor wants to see; the record your page reads still holds every locale.
 
 The values are those of the saved record: changes not saved yet are not shown. More fields may be added later, so ignore the ones you don't know.
 
@@ -124,7 +127,7 @@ Relations come as ids. To show related records, read them from PocketBase's reco
 - Serve the page over HTTPS, keep the token out of URLs and logs, and don't cache or index the page (`Cache-Control: no-store`, `noindex`).
 - Show rich text only with the hooks that sanitize it installed (see below).
 
-[`examples/lantern-coffee/preview-site/server.mjs`](examples/lantern-coffee/preview-site/server.mjs) is a small page that does this, with no dependencies. The example config points `posts` and `about` at it, so with the [development PocketBase](#try-it-with-a-development-pocketbase) running, start it with `node examples/lantern-coffee/preview-site/server.mjs` and press the button. In your own site's config, change or remove those `previewUrl`s.
+[`examples/lantern-coffee/preview-site/server.mjs`](examples/lantern-coffee/preview-site/server.mjs) is a small page that does this, with no dependencies. The example config points `posts`, `events` and `about` at it, so with the [development PocketBase](#try-it-with-a-development-pocketbase) running, start it with `node examples/lantern-coffee/preview-site/server.mjs` and press the button. In your own site's config, change or remove those `previewUrl`s.
 
 ## PocketBase hooks
 

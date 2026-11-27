@@ -88,6 +88,7 @@
 	"form_required": "必須",
 	"form_locale_tabs": "{field}の言語",
 	"form_locale_has_error": "エラーあり",
+	"form_locale_empty": "未入力",
 	"form_error_required": "入力してください。",
 	"form_error_min_length": "{min}文字以上で入力してください。",
 	"form_error_max_length": "{max}文字以内で入力してください。",

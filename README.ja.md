@@ -100,7 +100,7 @@ app := pocketbase.New()
 pbcms.Register(app)
 ```
 
-`pbcms.Register` は `GET /api/cms/schema` を追加します。応答・権限の判定・`PBCMS_CONFIG_PATH` の扱いは `pbcms_schema.pb.js` と同じなので、このフックは一緒に入れないでください。ほかのフックはまだパッケージにありません。それまでは、[`tests/gopocketbase/main.go`](tests/gopocketbase/main.go) と同じように PocketBase の `jsvm` プラグインを登録し、`pbcms_sanitize.pb.js`・`pbcms_media_urls.pb.js`・`pbcms_preview.pb.js`・`pbcms_notify.pb.js` を、それらが読み込む `pbcms/` フォルダと一緒に `pb_hooks/` に置いてください。
+`pbcms.Register` は `pbcms_schema.pb.js`・`pbcms_sanitize.pb.js`・`pbcms_media_urls.pb.js` の代わりになります。応答と環境変数（`PBCMS_CONFIG_PATH`・`PBCMS_PUBLIC_URL`）の扱いも同じです。`GET /api/cms/schema` を追加し、保存時に同じ許可リストで `editor` 型の項目を無害化し、応答でもう一度無害化して画像の URL を引き直します。この3つのフックは一緒に入れないでください。Go のサニタイザーは `hooks/pb_hooks/pbcms/html.cjs` を移植したもので、テストで両方に同じ入力を与えて出力が同じことを確かめています。ほかのフックはまだパッケージにありません。それまでは、[`tests/gopocketbase/main.go`](tests/gopocketbase/main.go) と同じように PocketBase の `jsvm` プラグインを登録し、`pbcms_preview.pb.js`・`pbcms_notify.pb.js` を、それらが読み込む `pbcms/` フォルダと一緒に `pb_hooks/` に置いてください。
 
 ## 開発
 

@@ -3,8 +3,8 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { type PocketBaseServer, startPocketBase } from '../pocketbase'
 import { anonymous, asEditor, asSuperuser, uniqueId } from './clients'
 
-// hooks/pb_hooks/pbcms_sanitize.pb.js cleans every `editor` field before it is saved, and
-// pbcms_media_urls.pb.js cleans it again in responses.
+// hooks/pb_hooks/pbcms_sanitize.pb.js (or the pbcms Go package) cleans every `editor` field before
+// it is saved, and pbcms_media_urls.pb.js cleans it again in responses.
 const hostile =
 	'<p onclick="steal()">Hello<script>alert(1)</script> <a href="javascript:alert(1)">link</a></p>' +
 	'<img src="x.png" onerror="alert(1)" width="10"><iframe src="https://evil.example"></iframe>'

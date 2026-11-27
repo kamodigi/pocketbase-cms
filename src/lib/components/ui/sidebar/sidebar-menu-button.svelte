@@ -60,7 +60,8 @@
 		'data-slot': 'sidebar-menu-button',
 		'data-sidebar': 'menu-button',
 		'data-size': size,
-		'data-active': isActive,
+		// Omitted when inactive: Tailwind's data-active: variant matches data-active="false" too.
+		'data-active': isActive || undefined,
 		...restProps,
 	})
 </script>

@@ -40,9 +40,9 @@ func schemaHandler(e *core.RequestEvent) error {
 	if !isEditor(e.Auth) {
 		return e.ForbiddenError("Only editors can read the CMS schema.", nil)
 	}
-	names, err := managedCollectionNames(e)
+	names, err := managedCollectionNames(e.App)
 	if err != nil {
-		return err
+		return configError(e)
 	}
 
 	collections := []schemaCollection{}

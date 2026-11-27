@@ -1,5 +1,5 @@
-// Shared helpers for the pocketbase-cms route hooks: who counts as an editor, and which collections
-// the CMS manages. Load it inside a handler with require(`${__hooks}/pbcms/cms.cjs`).
+// Shared helpers for the pocketbase-cms hooks: who counts as an editor, and which collections the
+// CMS manages. Load it inside a handler with require(`${__hooks}/pbcms/cms.cjs`).
 
 'use strict'
 

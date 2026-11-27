@@ -37,7 +37,27 @@ CMS は自分と同じフォルダの `config.json` を読み込みます。サ�
 ```
 
 ファイルが無いときや書式が正しくないときは、CMS は画面の代わりにエラーを表示します。
-PocketBase のスキーマに無いコレクションや項目を設定に書いた場合は、画面の上部に警告を出し、その設定を無視します（画面が `GET /api/cms/schema` からスキーマを読むようになってから有効になります）。
+PocketBase のスキーマに無いコレクションや項目を設定に書いた場合は、画面の上部に警告を出し、その設定を無視します。ログインのあとに、`GET /api/cms/schema` から読んだスキーマと照らし合わせます。
+
+### ログインとナビゲーション
+
+ログインできるのは、`users` のうち `role = "editor"` のアカウントだけです。それ以外のアカウントはメッセージを出してすぐにログアウトします。編集者のアカウントが削除されたり権限を外されたりした場合は、次に CMS を開いたときにログアウトします。ログインの状態はブラウザのローカルストレージに保存されるので、再読み込みしても続き、1つのタブでログアウトするとすべてのタブでログアウトします。
+
+「パスワードを忘れた場合」からは、PocketBase 標準の `users` のパスワード再設定の依頼を呼びます。メールは PocketBase が送るので、ダッシュボードでメールの設定（SMTP）をしてください。必要なら `users` コレクションの設定で「Reset password」のテンプレートも変えられます。既定のテンプレートのリンクは、新しいパスワードを設定する PocketBase 自身のページを開きます。CMS は、そのアドレスのアカウントがあってもなくても同じ確認の文を表示します。
+
+サイドバーには `collections` のコレクションを `nav` のグループ分けで並べます。`nav` に書いていないコレクションは最後のグループの末尾に足します。`nav` が無いときは、設定の順に1つのグループにまとめます。ログインすると、サイドバーの最初のコレクションを開きます。`icon` には次の Lucide のアイコン名を使えます。それ以外の名前は `file-text` になります：`award`、`bell`、`book-open`、`box`、`briefcase`、`building`、`calendar`、`camera`、`clipboard-list`、`coffee`、`file`、`file-text`、`folder`、`gift`、`globe`、`graduation-cap`、`handshake`、`heart`、`house`、`image`、`images`、`info`、`layers`、`layout-grid`、`link`、`list`、`mail`、`map`、`map-pin`、`megaphone`、`message-square`、`newspaper`、`package`、`pen-line`、`phone`、`quote`、`rss`、`settings`、`shopping-bag`、`star`、`store`、`tag`、`ticket`、`trophy`、`user`、`users`、`utensils`、`video`。
+
+### 一覧画面
+
+コレクションの画面は、レコードの表です。
+
+- **列**は `list.columns` で、見出しには `fields` の表示名を使います。指定が無いときは、タイトルの項目（`titleField`、無ければ最初の text 型の項目）、`status` があれば公開状態、`updated` の項目があればそれを表示します。タイトルはレコードへのリンクです。画像はサムネイルで、関連するレコードは名前で表示します。
+- **検索**は、`list.search` の項目（指定が無ければタイトルの項目）に、入力した文字列を含むレコードを探します。
+- **絞り込み**：`status` があるコレクションは、公開・予約公開（`publishedAtField` があるときだけ）・下書きで絞り込めます。
+- **並び順**は `list.sort`、指定が無ければ `updated` の新しい順です。日付の列の見出しを選ぶとその日付の新しい順に、もう一度選ぶと逆順に並べ替えます。
+- **ページ**は `list.perPage` 件ごとです（指定が無ければ30件）。
+
+ページ・検索・絞り込み・並び順は URL に残るので、再読み込みや「戻る」をしても保たれます。言語ごとの項目は、`locales` の最初の言語の値を表示・検索・並べ替えに使います。`singleton: true` のコレクションには一覧が無く、1件だけのレコードを直接開きます。
 
 ## PocketBase のフック
 
@@ -49,6 +69,7 @@ JavaScript のフックは [`hooks/pb_hooks/`](hooks/pb_hooks) にあります�
 | `pbcms_media_urls.pb.js` | API の応答で、`editor` 型の項目をもう一度無害化し、`<img data-media-id="…">` の画像を、その `media` レコードの今のファイルに向ける           |
 | `pbcms_schema.pb.js`     | `GET /api/cms/schema` を追加し、ログイン済みの編集者に、CMS が扱うコレクションの定義を返す                                                   |
 | `pbcms_preview.pb.js`    | 編集者に期限付きのプレビュー用トークンを発行し、`GET /api/cms/preview/{collection}/{id}` を追加する。サイトはこのトークンで下書きを1件読める |
+| `pbcms_notify.pb.js`     | CMS が扱うコレクションのレコードの作成・更新・削除を、サイトに POST で知らせる                                                               |
 
 サニタイズでは、CMS のエディタが書き出すタグと属性（段落、見出し、リスト、リンク、画像、表、文字の揃えと色）だけを残し、script、イベントハンドラ、`javascript:` の URL などはすべて取り除きます。200,000 文字を超えるリッチテキストは保存できません。
 
@@ -61,6 +82,30 @@ CMS は本文中の画像を `<img src="…" data-media-id="<media のレコー�
 プレビューのフックを使うと、サイトに編集者のトークンを渡さずに下書きを見せられます。編集者が `POST /api/cms/preview/{collection}/{id}/token` を呼ぶと `{ "token", "expiresAt" }` が返ります。トークンはそのレコード1件だけに使え、10分で切れます（変えるには環境変数 `PBCMS_PREVIEW_TOKEN_DURATION` に秒数を指定します）。ログインしていなければ 401、編集者以外は 403、CMS が扱わないコレクション（`GET /api/cms/schema` と同じもの）や無いレコードは 404 になります。サイトは `GET /api/cms/preview/{collection}/{id}` を `Authorization: Bearer <token>` を付けて呼ぶと、コレクションの閲覧ルールにかかわらず、下書きを含めて PocketBase のレコードの API と同じ形でレコードを受け取ります。応答には `Cache-Control: no-store` が付きます。トークンが無い・正しくない・期限切れなら 401、別のレコードのトークンなら 403、レコードが消されていれば 404 です。トークンは編集者自身のトークンキーで署名するので、編集者のパスワードが変わったり、編集者の役割が外れたりすると、すぐに使えなくなります。PocketBase の認証トークンではなく、その代わりにもなりません。
 
 データベースに HTML が入る経路は、PocketBase を通した保存だけではありません。フックを入れる前に保存したレコード、バックアップからの復元、生の SQL、サニタイズのあとで値を書き換える別のフックは、保存時の無害化を通りません。そのため、メディアのフックは応答でもすべての `editor` 型の項目を無害化します。`media` を使わない場合も、両方のフックを入れてください。
+
+### サイトへの通知
+
+`pbcms_notify.pb.js` を使うと、内容が変わったときにサイトでページを作り直したり再検証したりできます。PocketBase の環境変数を2つとも設定してください。`PBCMS_NOTIFY_URL` が無ければ、フックは何もしません。
+
+| 環境変数              | 値                                                                   |
+| --------------------- | -------------------------------------------------------------------- |
+| `PBCMS_NOTIFY_URL`    | 通知の送り先。例：`https://www.example.com/api/revalidate`           |
+| `PBCMS_NOTIFY_SECRET` | サイト側で確かめる長いランダムな文字列。設定が無ければ何も送りません |
+
+対象は `GET /api/cms/schema` と同じコレクション（設定の `collections` と `media.collection`。システムのコレクションは含みません）で、CMS・API・ダッシュボード・`app.save()` のどれで変えても通知します。変更1件につき `POST` を1回送り、`X-Pbcms-Secret` ヘッダーに秘密の文字列を入れ、本文は次の JSON です。
+
+```json
+{
+	"collection": "posts",
+	"action": "update",
+	"old": { "id": "abc123def456ghi", "slug": "old-slug", "draft": false, "…": "…" },
+	"new": { "id": "abc123def456ghi", "slug": "new-slug", "draft": false, "…": "…" }
+}
+```
+
+`action` は `create`・`update`・`delete` のどれかです。`old` と `new` は変更前と変更後の保存されたレコードで、作成では `old` が、削除では `new` が `null` になります。中身は API が返す項目で、hidden の項目、メールアドレスを非公開にしている認証レコードのメールアドレス、expand したリレーションは含みません。コレクションの API ルールにかかわらず、下書きも通知します。リッチテキストは API の応答ではなく保存されたままの値です（上のメディアのフックを参照）。通知は何が変わったかを知るために使い、表示する内容は API から読んでください。
+
+受け口では、ヘッダーの値を秘密の文字列と定数時間で比べ、2xx のステータスを返してください。送り先にはリダイレクトされない最終の URL を指定してください（リダイレクトされると本文が届かないことがあります）。PocketBase は変更を確定したあとに通知を1件ずつ送り、応答を最大10秒待つので、受け口が遅いと保存も遅くなります。通知に失敗しても、保存は取り消されず、エラーにもなりません。PocketBase のログ（ダッシュボードの Logs）に `pbcms: could not notify the site` として残り、再送はしません。
 
 ### Go パッケージ
 
@@ -75,7 +120,7 @@ app := pocketbase.New()
 pbcms.Register(app)
 ```
 
-`pbcms.Register` は `GET /api/cms/schema` とプレビューのルート（`POST /api/cms/preview/{collection}/{id}/token` と `GET /api/cms/preview/{collection}/{id}`）を追加します。応答・権限の判定・環境変数（`PBCMS_CONFIG_PATH`・`PBCMS_PREVIEW_TOKEN_DURATION`）の扱いは `pbcms_schema.pb.js`・`pbcms_preview.pb.js` と同じなので、これらのフックは一緒に入れないでください。プレビュー用トークンも同じものなので、JavaScript のフックが発行したトークンは Go パッケージでも使え、その逆も使えます。ほかのフックはまだパッケージにありません。それまでは、[`tests/gopocketbase/main.go`](tests/gopocketbase/main.go) と同じように PocketBase の `jsvm` プラグインを登録し、`pbcms_sanitize.pb.js`・`pbcms_media_urls.pb.js` を、それらが読み込む `pbcms/` フォルダと一緒に `pb_hooks/` に置いてください。
+`pbcms.Register` は `GET /api/cms/schema` とプレビューのルート（`POST /api/cms/preview/{collection}/{id}/token` と `GET /api/cms/preview/{collection}/{id}`）を追加します。応答・権限の判定・環境変数（`PBCMS_CONFIG_PATH`・`PBCMS_PREVIEW_TOKEN_DURATION`）の扱いは `pbcms_schema.pb.js`・`pbcms_preview.pb.js` と同じなので、これらのフックは一緒に入れないでください。プレビュー用トークンも同じものなので、JavaScript のフックが発行したトークンは Go パッケージでも使え、その逆も使えます。ほかのフックはまだパッケージにありません。それまでは、[`tests/gopocketbase/main.go`](tests/gopocketbase/main.go) と同じように PocketBase の `jsvm` プラグインを登録し、`pbcms_sanitize.pb.js`・`pbcms_media_urls.pb.js`・`pbcms_notify.pb.js` を、それらが読み込む `pbcms/` フォルダと一緒に `pb_hooks/` に置いてください。
 
 ## 開発
 

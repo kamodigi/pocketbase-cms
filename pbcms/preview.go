@@ -75,9 +75,9 @@ func previewTokenHandler(e *core.RequestEvent) error {
 	if !isEditor(e.Auth) {
 		return e.ForbiddenError("Only editors can preview records.", nil)
 	}
-	names, err := managedCollectionNames(e)
+	names, err := managedCollectionNames(e.App)
 	if err != nil {
-		return err
+		return configError(e)
 	}
 	collection := findManagedCollection(e.App, names, e.Request.PathValue("collection"))
 	if collection == nil {

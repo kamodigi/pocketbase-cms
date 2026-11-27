@@ -23,8 +23,19 @@ export interface SchemaCollection {
 	name: string
 }
 
+/**
+A field definition as PocketBase returns it. Only the properties the CMS reads are listed.
+*/
 export interface SchemaField {
 	name: string
+	/**
+	Set on the `id` field.
+	*/
+	primaryKey?: boolean
+	/**
+	For file fields: files need a file token to be read.
+	*/
+	protected?: boolean
 	type: string
 }
 

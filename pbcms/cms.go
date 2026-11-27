@@ -18,12 +18,12 @@ func isEditor(record *core.Record) bool {
 
 // managedCollectionNames returns the names of the collections the CMS manages (see
 // configCollectionNames). The config is read on every call from PBCMS_CONFIG_PATH if set, else from
-// pb_public/cms/config.json next to pb_data (PocketBase's default layout). It returns a 500 error,
-// ready to return from a handler, if the config cannot be read.
-func managedCollectionNames(e *core.RequestEvent) ([]string, error) {
+// pb_public/cms/config.json next to pb_data (PocketBase's default layout). If the config cannot be
+// read, it logs why and returns the error; a route handler answers with configError.
+func managedCollectionNames(app core.App) ([]string, error) {
 	configPath := os.Getenv("PBCMS_CONFIG_PATH")
 	if configPath == "" {
-		configPath = filepath.Join(e.App.DataDir(), "..", "pb_public", "cms", "config.json")
+		configPath = filepath.Join(app.DataDir(), "..", "pb_public", "cms", "config.json")
 	}
 	data, err := os.ReadFile(configPath)
 	var names []string
@@ -31,10 +31,15 @@ func managedCollectionNames(e *core.RequestEvent) ([]string, error) {
 		names, err = configCollectionNames(data)
 	}
 	if err != nil {
-		e.App.Logger().Error("pbcms: could not read the CMS config", "path", configPath, "error", err.Error())
-		return nil, e.InternalServerError("The CMS config could not be read on the server.", nil)
+		app.Logger().Error("pbcms: could not read the CMS config", "path", configPath, "error", err.Error())
+		return nil, err
 	}
 	return names, nil
+}
+
+// configError is the 500 a route answers with when managedCollectionNames fails.
+func configError(e *core.RequestEvent) error {
+	return e.InternalServerError("The CMS config could not be read on the server.", nil)
 }
 
 // findManagedCollection returns the collection called name if names (from managedCollectionNames)

@@ -37,7 +37,27 @@ Point `$schema` at it to get completion and checks in your editor:
 ```
 
 If the file is missing or invalid, the CMS shows the errors instead of the screens.
-When the config names a collection or field that your PocketBase schema does not have, the CMS will show a warning at the top of the screen and ignore that setting (once the screens read the schema from `GET /api/cms/schema`).
+When the config names a collection or field that your PocketBase schema does not have, the CMS shows a warning at the top of the screen and ignores that setting. It checks this after sign-in, against the schema from `GET /api/cms/schema`.
+
+### Sign-in and navigation
+
+Only `users` accounts with `role = "editor"` can sign in; anyone else is signed out again with a message. If an editor's account is deleted or loses the role, the CMS signs them out on the next start. The session is kept in the browser's local storage, so it survives a reload and signing out in one tab signs out every tab.
+
+"Forgot your password?" calls PocketBase's own password reset request for `users`. PocketBase sends the email, so configure its mail settings (SMTP) and, if you like, the "Reset password" template under the `users` collection's options in the dashboard. The link in the default template opens PocketBase's own page for setting a new password. The CMS shows the same confirmation whether or not the address has an account.
+
+The sidebar lists the collections in `collections`, grouped by `nav`. Collections that `nav` does not list are appended to its last group; without `nav` they form one group in config order. After sign-in the CMS opens the first collection in the sidebar. `icon` takes one of these Lucide icon names, and any other name shows `file-text`: `award`, `bell`, `book-open`, `box`, `briefcase`, `building`, `calendar`, `camera`, `clipboard-list`, `coffee`, `file`, `file-text`, `folder`, `gift`, `globe`, `graduation-cap`, `handshake`, `heart`, `house`, `image`, `images`, `info`, `layers`, `layout-grid`, `link`, `list`, `mail`, `map`, `map-pin`, `megaphone`, `message-square`, `newspaper`, `package`, `pen-line`, `phone`, `quote`, `rss`, `settings`, `shopping-bag`, `star`, `store`, `tag`, `ticket`, `trophy`, `user`, `users`, `utensils`, `video`.
+
+### List screens
+
+A collection's screen is a table of its records.
+
+- **Columns** are `list.columns`, with the labels from `fields`. Without it, the list shows the title field (`titleField`, or the first text field), the publish state if the collection has `status`, and `updated` if it has that field. The title links to the record. Images are shown as thumbnails and related records by name.
+- **Search** matches the fields in `list.search` (by default the title field) for the typed text.
+- **Filter**: with `status`, the list can be narrowed to published, scheduled (only with `publishedAtField`) or draft records.
+- **Sort**: the order is `list.sort`, or else newest `updated` first. Selecting the header of a date column sorts by that date, newest first, and selecting it again reverses the order.
+- **Pages** hold `list.perPage` records (30 by default).
+
+The page, search, filter and sort are kept in the URL, so reloading and going back keep them. A localized field shows, searches and sorts the first locale in `locales`. A collection with `singleton: true` has no list: the CMS opens its one record.
 
 ## PocketBase hooks
 
@@ -49,6 +69,7 @@ The JavaScript hooks live in [`hooks/pb_hooks/`](hooks/pb_hooks). Copy the files
 | `pbcms_media_urls.pb.js` | In API responses, cleans every `editor` field again and points each `<img data-media-id="…">` at the current file of that `media` record              |
 | `pbcms_schema.pb.js`     | Adds `GET /api/cms/schema`, which gives signed-in editors the definitions of the collections the CMS manages                                          |
 | `pbcms_preview.pb.js`    | Issues short-lived preview tokens to editors and adds `GET /api/cms/preview/{collection}/{id}`, which lets your site read one draft with such a token |
+| `pbcms_notify.pb.js`     | POSTs to your site when a record of a collection the CMS manages is created, updated or deleted                                                       |
 
 The sanitizer keeps the tags and attributes the CMS's editor writes (paragraphs, headings, lists, links, images, tables, text alignment and colors) and removes everything else, including scripts, event handlers and `javascript:` URLs. A rich text field longer than 200,000 characters is refused on save.
 
@@ -61,6 +82,30 @@ File URLs start with the `PBCMS_PUBLIC_URL` environment variable (for example `h
 The preview hook lets your site show a draft without ever seeing an editor's token. An editor calls `POST /api/cms/preview/{collection}/{id}/token` and gets `{ "token", "expiresAt" }`: a token for that one record, valid for 10 minutes (set `PBCMS_PREVIEW_TOKEN_DURATION` to a number of seconds to change it). It answers 401 without a sign-in, 403 for anyone but an editor, and 404 for a collection the CMS does not manage (the same ones as `GET /api/cms/schema`) or a missing record. Your site then calls `GET /api/cms/preview/{collection}/{id}` with `Authorization: Bearer <token>` and gets the record as PocketBase's record API returns it, drafts included, whatever the collection's view rule says, with `Cache-Control: no-store`. A missing, invalid or expired token gets 401, a token for another record 403, and a deleted record 404. A token is signed with the editor's own token key, so it stops working when the editor's password changes or the editor loses the role. It is not a PocketBase auth token and cannot be used as one.
 
 Saving through PocketBase is not the only way HTML gets into the database: records saved before the hooks were installed, restored backups, raw SQL, and a hook that changes a value after the sanitizer has run all skip the save-time check. That is why the media hook sanitizes every `editor` field in responses too. Install both hooks, even if you don't use `media`.
+
+### Notifications to your site
+
+`pbcms_notify.pb.js` lets your site rebuild or revalidate its pages when content changes. Set both environment variables of PocketBase; without `PBCMS_NOTIFY_URL` the hook does nothing.
+
+| Variable              | Value                                                                            |
+| --------------------- | -------------------------------------------------------------------------------- |
+| `PBCMS_NOTIFY_URL`    | Where to send the notification, such as `https://www.example.com/api/revalidate` |
+| `PBCMS_NOTIFY_SECRET` | A long random string that your site checks. Nothing is sent without it           |
+
+It covers the same collections as `GET /api/cms/schema` (the config's `collections` and `media.collection`, never system collections), however the record changes: the CMS, the API, the dashboard or `app.save()`. Each change is one `POST` with the secret in the `X-Pbcms-Secret` header and a JSON body:
+
+```json
+{
+	"collection": "posts",
+	"action": "update",
+	"old": { "id": "abc123def456ghi", "slug": "old-slug", "draft": false, "…": "…" },
+	"new": { "id": "abc123def456ghi", "slug": "new-slug", "draft": false, "…": "…" }
+}
+```
+
+`action` is `create`, `update` or `delete`. `old` and `new` are the stored record before and after the change; `old` is `null` for a create and `new` is `null` for a delete. They hold the fields the API returns, without hidden fields, without the email of an auth record that hides it, and without expanded relations. Drafts are notified too, whatever the collection's API rules say. Rich text is as stored, not as the API returns it (see the media hook above), so use the notification to find what changed and read the content to display from the API.
+
+Your endpoint should compare the header with its secret in constant time and answer with a 2xx status. Use its final URL: a redirected request may arrive without its body. PocketBase sends the notification after the change is committed, one at a time, and waits up to 10 seconds for the answer, so a slow endpoint slows down saving. A failure never undoes or fails the save: it is written to PocketBase's logs (Dashboard → Logs) as `pbcms: could not notify the site`, and the notification is not retried.
 
 ### Go package
 
@@ -75,7 +120,7 @@ app := pocketbase.New()
 pbcms.Register(app)
 ```
 
-`pbcms.Register` adds `GET /api/cms/schema` and the preview routes (`POST /api/cms/preview/{collection}/{id}/token` and `GET /api/cms/preview/{collection}/{id}`), with the same answers, the same checks and the same environment variables (`PBCMS_CONFIG_PATH`, `PBCMS_PREVIEW_TOKEN_DURATION`) as `pbcms_schema.pb.js` and `pbcms_preview.pb.js`; don't install those hooks as well. Preview tokens are the same in both, so one issued by the JavaScript hook works with the Go package and the other way round. The other hooks are not in the package yet: until they are, register PocketBase's `jsvm` plugin and keep `pbcms_sanitize.pb.js` and `pbcms_media_urls.pb.js` in `pb_hooks/`, with the `pbcms/` folder they load, as [`tests/gopocketbase/main.go`](tests/gopocketbase/main.go) does.
+`pbcms.Register` adds `GET /api/cms/schema` and the preview routes (`POST /api/cms/preview/{collection}/{id}/token` and `GET /api/cms/preview/{collection}/{id}`), with the same answers, the same checks and the same environment variables (`PBCMS_CONFIG_PATH`, `PBCMS_PREVIEW_TOKEN_DURATION`) as `pbcms_schema.pb.js` and `pbcms_preview.pb.js`; don't install those hooks as well. Preview tokens are the same in both, so one issued by the JavaScript hook works with the Go package and the other way round. The other hooks are not in the package yet: until they are, register PocketBase's `jsvm` plugin and keep `pbcms_sanitize.pb.js`, `pbcms_media_urls.pb.js` and `pbcms_notify.pb.js` in `pb_hooks/`, with the `pbcms/` folder they load, as [`tests/gopocketbase/main.go`](tests/gopocketbase/main.go) does.
 
 ## Development
 

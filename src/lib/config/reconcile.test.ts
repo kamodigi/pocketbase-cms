@@ -194,6 +194,45 @@ describe('reconcileConfig', () => {
 		expect(warnings.map(w => w.path)).toEqual(['/collections/posts/fields/slug/slugFrom'])
 	})
 
+	it('drops a displayField the related collection does not have, keeping one outside the CMS', () => {
+		const config = valid({
+			collections: {
+				posts: {
+					fields: {
+						author: { displayField: 'nickname' },
+						place: { displayField: 'label' },
+						store: { displayField: 'name' },
+					},
+				},
+				stores: {},
+			},
+			version: 1,
+		})
+		const posts: SchemaCollection = {
+			fields: [
+				{ collectionId: 'col_users', name: 'author', type: 'relation' },
+				{ collectionId: 'col_stores', name: 'place', type: 'relation' },
+				{ collectionId: 'col_stores', name: 'store', type: 'relation' },
+			],
+			name: 'posts',
+		}
+		const stores = { ...collection('stores', 'name'), id: 'col_stores' }
+
+		const { config: result, warnings } = reconcileConfig(config, [posts, stores])
+
+		expect(result.collections.posts?.fields).toEqual({
+			author: { displayField: 'nickname' },
+			place: {},
+			store: { displayField: 'name' },
+		})
+		expect(warnings).toEqual([
+			{
+				message: 'the PocketBase collection "stores" has no field "label"; ignored',
+				path: '/collections/posts/fields/place/displayField',
+			},
+		])
+	})
+
 	it('drops missing media fields, and the media library without its file field', () => {
 		const withoutCaption = [...blogSchema.slice(0, 2), collection('media', 'file', 'alt', 'width', 'height', 'mime')]
 		const partial = reconcileConfig(valid(blog), withoutCaption)

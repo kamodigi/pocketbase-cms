@@ -5,6 +5,7 @@
 	import * as Select from '#lib/components/ui/select/index.js'
 	import { Textarea } from '#lib/components/ui/textarea/index.js'
 	import { parseDate } from '#lib/list/request.js'
+	import RelationInput from '#lib/relation/relation-input.svelte'
 	import { m } from '#paraglide/messages.js'
 
 	import type { FormField } from './model'
@@ -113,6 +114,12 @@
 					<Label class="font-normal" for="{id}-{option.value}">{option.label}</Label>
 				</div>
 			{/each}
+		</fieldset>
+		{@render messages()}
+	{:else if field.kind === 'relation' || field.kind === 'relations'}
+		<fieldset class="grid min-w-0 gap-1.5" aria-describedby={describedBy}>
+			<legend class="mb-1.5 text-sm leading-none font-medium">{@render labelText()}</legend>
+			<RelationInput {describedBy} {field} {invalid} onchange={setValue} {value} />
 		</fieldset>
 		{@render messages()}
 	{:else if field.kind === 'autodate'}

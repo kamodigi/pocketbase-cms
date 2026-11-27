@@ -1,9 +1,12 @@
 // The edit screens of the example presets: create, update and delete a store (the list type), write
-// a post (the article type) and edit the single page.
+// a post (the article type), choose its related records and edit the single page.
 import { expect, type Page, test } from '@playwright/test'
 import PocketBase from 'pocketbase'
 
 import { devAccounts } from '../pocketbase'
+
+// A 1x1 transparent PNG.
+const pixel = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=='
 
 async function asEditor(baseURL: string): Promise<PocketBase> {
 	const pb = new PocketBase(baseURL)
@@ -147,4 +150,57 @@ test('the single page is edited, never created or deleted', async ({ baseURL, pa
 	// There is no new-record screen for it.
 	await page.goto('/cms/#/collections/about/new')
 	await expect(page).toHaveURL(new RegExp(`#/collections/about/${about.id}$`))
+})
+
+test('the cover and the stores of a post are searched, chosen and saved', async ({ baseURL, page }) => {
+	const editor = await asEditor(baseURL!)
+	const tag = uniqueTag()
+	for (const name of ['Pier', 'Market']) {
+		await editor.collection('stores').create({ name: `${name} ${tag}`, region: 'south' })
+	}
+	const file = new File([Buffer.from(pixel, 'base64')], 'pixel.png', { type: 'image/png' })
+	const image = await editor.collection('media').create({ alt: `Cup ${tag}`, file })
+	await signIn(page)
+	await page.getByRole('link', { name: 'New' }).click()
+	await page.getByRole('textbox', { name: /^Title/ }).fill(tag)
+
+	// One record: the cover, chosen from the media collection by its alt text.
+	await page.getByRole('button', { name: 'Choose Cover image' }).click()
+	const covers = page.getByRole('dialog', { name: 'Choose Cover image' })
+	await covers.getByRole('searchbox', { name: 'Search' }).fill(tag)
+	await covers.getByRole('button', { name: `Cup ${tag}` }).click()
+	await expect(covers).toBeHidden()
+
+	// Several records, in the order they are chosen. Enter searches without saving the post.
+	const chooseStores = page.getByRole('button', { name: 'Choose Stores' })
+	await chooseStores.click()
+	const stores = page.getByRole('dialog', { name: 'Choose Stores' })
+	await stores.getByRole('searchbox', { name: 'Search' }).fill(tag)
+	await stores.getByRole('searchbox', { name: 'Search' }).press('Enter')
+	await expect(stores.getByRole('checkbox')).toHaveCount(2)
+	await stores.getByRole('checkbox', { name: `Pier ${tag}` }).check()
+	await stores.getByRole('checkbox', { name: `Market ${tag}` }).check()
+	await expect(stores).toHaveAccessibleDescription('2 of up to 5 chosen')
+	await page.keyboard.press('Escape')
+	await expect(stores).toBeHidden()
+	await expect(chooseStores).toBeFocused()
+
+	await page.getByRole('button', { name: 'Create' }).click()
+	await expect(page.getByText(`Created “${tag}”.`)).toBeVisible()
+	const post = await editor
+		.collection('posts')
+		.getFirstListItem(editor.filter('slug = {:slug}', { slug: tag }), { expand: 'stores' })
+	expect(post.cover).toBe(image.id)
+	expect((post.expand?.stores as { name: string }[]).map(store => store.name)).toEqual([`Pier ${tag}`, `Market ${tag}`])
+
+	// The saved records are named again, and a removal is saved.
+	await page.reload()
+	await expect(page.getByRole('button', { name: `Remove Cup ${tag}` })).toBeVisible()
+	await page.getByRole('button', { name: `Remove Pier ${tag}` }).click()
+	await page.getByRole('button', { name: `Remove Cup ${tag}` }).click()
+	await page.getByRole('button', { name: 'Save' }).click()
+	await expect(page.getByText(`Saved “${tag}”.`)).toBeVisible()
+	const saved = await editor.collection('posts').getOne(post.id)
+	expect(saved.cover).toBe('')
+	expect(saved.stores).toEqual([post.stores[1]])
 })

@@ -24,6 +24,10 @@
 		The collection's name in PocketBase.
 		*/
 		collection: string
+		/**
+		The whole schema, for the targets of relation fields.
+		*/
+		collections?: SchemaCollection[]
 		config: CmsConfig
 		/**
 		The collection's name on screen.
@@ -37,10 +41,10 @@
 		uiLocale: string
 	}
 
-	let { collection, config, label, record, schema, uiLocale }: Props = $props()
+	let { collection, collections = [], config, label, record, schema, uiLocale }: Props = $props()
 
 	// The props stay the same for the life of the form: the page renders a new form per record.
-	const model = untrack(() => buildFormModel(config, schema, uiLocale))
+	const model = untrack(() => buildFormModel(config, schema, uiLocale, collections))
 	const isSingleton = untrack(() => Boolean(config.collections[collection]?.singleton))
 	const fields = [...model.main, ...model.side]
 

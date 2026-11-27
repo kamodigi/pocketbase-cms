@@ -59,6 +59,14 @@ A collection's screen is a table of its records.
 
 The page, search, filter and sort are kept in the URL, so reloading and going back keep them. A localized field shows, searches and sorts the first locale in `locales`. A collection with `singleton: true` has no list: the CMS opens its one record.
 
+### Relation fields
+
+On the edit screen, a `relation` field shows the chosen records by name. "Choose …" opens a dialog that searches the related collection and picks one record, or several when the field's `maxSelect` is more than 1; several are saved in the order they were chosen.
+
+- **Name**: the field's `displayField`, or else the related collection's `titleField` (or first text field), or else its `name`, `title` or `email`. A record with none of these, or one that PocketBase does not show to the editor, appears as its id.
+- **Search** matches that name field and the related collection's `list.search`. Records are in its `list.sort` order.
+- **Collections outside the config** (such as `users`) work too. PocketBase's list and view rules decide which of their records an editor can choose, and their names are read from `displayField`, `name`, `title` or `email`.
+
 ## PocketBase hooks
 
 The JavaScript hooks live in [`hooks/pb_hooks/`](hooks/pb_hooks). Copy the files you need, together with the `pbcms/` folder they load, into your PocketBase's `pb_hooks/`.
@@ -178,7 +186,7 @@ Sign in at the CMS with `editor@example.com` / `password1234`. The PocketBase da
 
 | Collection | Type        | Notes                                                                                   |
 | ---------- | ----------- | --------------------------------------------------------------------------------------- |
-| `posts`    | Article     | Title, slug, rich text body, cover image, category, draft flag and publish date         |
+| `posts`    | Article     | Title, slug, rich text body, cover image, category, stores, draft flag and publish date |
 | `stores`   | List        | Flat records with a select field and a URL                                              |
 | `about`    | Single page | One record, created by the migration; editors can update it but not create or delete it |
 | `media`    | Media       | Image file, required alt text, caption, width and height                                |

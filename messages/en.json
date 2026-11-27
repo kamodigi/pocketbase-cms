@@ -96,5 +96,19 @@
 	"form_error_date_min": "Choose {date} or later.",
 	"form_error_date_max": "Choose {date} or earlier.",
 	"form_error_option": "Choose one of the options.",
-	"form_error_max_select": "Choose up to {max}."
+	"form_error_max_select": "Choose up to {max}.",
+	"form_error_min_select": "Choose at least {min}.",
+	"relation_choose": "Choose {field}",
+	"relation_remove": "Remove {name}",
+	"relation_none": "Nothing chosen.",
+	"relation_search": "Search",
+	"relation_selected": "{count} of up to {max} chosen",
+	"relation_no_results": "No records match.",
+	"relation_empty": "There are no records to choose from.",
+	"relation_loading": "Loading…",
+	"relation_load_more": "Show more",
+	"relation_error": "Could not load the records: {message}",
+	"relation_retry": "Try again",
+	"relation_done": "Done",
+	"relation_close": "Close"
 }

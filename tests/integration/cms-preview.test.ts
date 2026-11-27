@@ -137,7 +137,7 @@ describe('preview tokens and GET /api/cms/preview', () => {
 			const response = await fetch(`${server.url}/api/collections/posts/records/${draft.id}`, {
 				headers: { Authorization: token },
 			})
-			expect(response.status).toBe(404)
+			expect(response.status).toBe(401)
 		})
 
 		it('answers 404 once the record is deleted', async () => {

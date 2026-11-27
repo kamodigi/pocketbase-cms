@@ -41,59 +41,67 @@ routerAdd('POST', '/api/cms/preview/{collection}/{id}/token', e => {
 	return e.json(200, { expiresAt, token })
 })
 
-routerAdd('GET', '/api/cms/preview/{collection}/{id}', e => {
-	const token = e.request.header.get('Authorization').replace(/^Bearer\s+/i, '')
-	if (token === '') throw new UnauthorizedError('A preview token is required.')
-	const cms = require(`${__hooks}/pbcms/cms.cjs`)
-	const preview = require(`${__hooks}/pbcms/preview.cjs`)
-	const claims = verifyToken(e.app, token)
-	if (!claims) throw new UnauthorizedError('The preview token is invalid or has expired.')
+// PocketBase (since v0.42) answers 401 to any Authorization header that is not one of its auth
+// tokens, before the handler runs. The middleware passed last has the same id as that check, so it
+// replaces it on this route only: the handler can read the preview token, and verifies it itself.
+routerAdd(
+	'GET',
+	'/api/cms/preview/{collection}/{id}',
+	e => {
+		const token = e.request.header.get('Authorization').replace(/^Bearer\s+/i, '')
+		if (token === '') throw new UnauthorizedError('A preview token is required.')
+		const cms = require(`${__hooks}/pbcms/cms.cjs`)
+		const preview = require(`${__hooks}/pbcms/preview.cjs`)
+		const claims = verifyToken(e.app, token)
+		if (!claims) throw new UnauthorizedError('The preview token is invalid or has expired.')
 
-	let collection
-	try {
-		collection = e.app.findCachedCollectionByNameOrId(e.request.pathValue('collection'))
-	} catch {
-		collection = undefined
-	}
-	if (!collection || collection.id !== claims.collection || e.request.pathValue('id') !== claims.record) {
-		throw new ForbiddenError('The preview token is for another record.')
-	}
-	let record
-	try {
-		record = e.app.findRecordById(collection, claims.record)
-	} catch {
-		throw new NotFoundError('The record was not found.')
-	}
-
-	$apis.enrichRecord(e, record)
-	e.response.header().set('Cache-Control', 'no-store')
-	return e.json(200, record)
-
-	/**
-	The claims of a valid, unexpired preview token, or undefined.
-	@param {core.App} app
-	@param {string} value
-	*/
-	function verifyToken(app, value) {
-		let editor
+		let collection
 		try {
-			const unverified = $security.parseUnverifiedJWT(value)
-			if (unverified.type !== preview.TOKEN_TYPE || typeof unverified.editor !== 'string') return
-			editor = app.findRecordById('users', unverified.editor)
+			collection = e.app.findCachedCollectionByNameOrId(e.request.pathValue('collection'))
 		} catch {
-			return
+			collection = undefined
 		}
-		if (!cms.isEditor(editor)) return
+		if (!collection || collection.id !== claims.collection || e.request.pathValue('id') !== claims.record) {
+			throw new ForbiddenError('The preview token is for another record.')
+		}
+		let record
 		try {
-			const verified = $security.parseJWT(value, preview.signingKey(editor))
-			const isValid =
-				verified.type === preview.TOKEN_TYPE &&
-				verified.editor === editor.id &&
-				typeof verified.collection === 'string' &&
-				typeof verified.record === 'string'
-			return isValid ? verified : undefined
+			record = e.app.findRecordById(collection, claims.record)
 		} catch {
-			return
+			throw new NotFoundError('The record was not found.')
 		}
-	}
-})
+
+		$apis.enrichRecord(e, record)
+		e.response.header().set('Cache-Control', 'no-store')
+		return e.json(200, record)
+
+		/**
+		The claims of a valid, unexpired preview token, or undefined.
+		@param {core.App} app
+		@param {string} value
+		*/
+		function verifyToken(app, value) {
+			let editor
+			try {
+				const unverified = $security.parseUnverifiedJWT(value)
+				if (unverified.type !== preview.TOKEN_TYPE || typeof unverified.editor !== 'string') return
+				editor = app.findRecordById('users', unverified.editor)
+			} catch {
+				return
+			}
+			if (!cms.isEditor(editor)) return
+			try {
+				const verified = $security.parseJWT(value, preview.signingKey(editor))
+				const isValid =
+					verified.type === preview.TOKEN_TYPE &&
+					verified.editor === editor.id &&
+					typeof verified.collection === 'string' &&
+					typeof verified.record === 'string'
+				return isValid ? verified : undefined
+			} catch {
+				return
+			}
+		}
+	},
+	new Middleware(e => e.next(), 9999, 'pbRejectUnknownToken'),
+)

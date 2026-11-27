@@ -5,9 +5,10 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { type PocketBaseServer, startPocketBase } from '../pocketbase'
 import { anonymous, asEditor, asSuperuser, mediaForm, uniqueId } from './clients'
 
-// hooks/pb_hooks/pbcms_media_urls.pb.js: API responses point <img data-media-id> at the media
-// record's current file. These tests change settings and rules, so they get their own PocketBase.
-// Its test-only raw-write.pb.js reads the stored value, which responses never show.
+// hooks/pb_hooks/pbcms_media_urls.pb.js (or the pbcms Go package): API responses point
+// <img data-media-id> at the media record's current file. These tests change settings and rules, so
+// they get their own PocketBase. Its test-only raw-write.pb.js reads the stored value, which
+// responses never show.
 describe('images in editor fields', () => {
 	let server: PocketBaseServer
 	let editor: PocketBase

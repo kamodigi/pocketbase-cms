@@ -169,7 +169,11 @@ app := pocketbase.New()
 pbcms.Register(app)
 ```
 
-`pbcms.Register` adds `GET /api/cms/schema` and the preview routes (`POST /api/cms/preview/{collection}/{id}/token` and `GET /api/cms/preview/{collection}/{id}`), with the same answers, the same checks and the same environment variables (`PBCMS_CONFIG_PATH`, `PBCMS_PREVIEW_TOKEN_DURATION`) as `pbcms_schema.pb.js` and `pbcms_preview.pb.js`, and notifies your site like `pbcms_notify.pb.js`, with the same request and the same `PBCMS_NOTIFY_URL` and `PBCMS_NOTIFY_SECRET`; don't install those hooks as well. Preview tokens are the same in both, so one issued by the JavaScript hook works with the Go package and the other way round. The other hooks are not in the package yet: until they are, register PocketBase's `jsvm` plugin and keep `pbcms_sanitize.pb.js` and `pbcms_media_urls.pb.js` in `pb_hooks/`, with the `pbcms/` folder they load, as [`tests/gopocketbase/main.go`](tests/gopocketbase/main.go) does.
+`pbcms.Register` replaces all the JavaScript hooks above, so don't install them as well. It reads the same environment variables (`PBCMS_CONFIG_PATH`, `PBCMS_PUBLIC_URL`, `PBCMS_PREVIEW_TOKEN_DURATION`, `PBCMS_NOTIFY_URL`, `PBCMS_NOTIFY_SECRET`):
+
+- It adds `GET /api/cms/schema` and the preview routes (`POST /api/cms/preview/{collection}/{id}/token` and `GET /api/cms/preview/{collection}/{id}`), with the same answers and the same checks. Preview tokens are the same in both, so one issued by the JavaScript hook works with the Go package and the other way round.
+- It notifies your site with the same request as `pbcms_notify.pb.js`.
+- It sanitizes `editor` fields on save with the same allowlist, and sanitizes them again in responses with image URLs looked up afresh. The Go sanitizer is a port of `hooks/pb_hooks/pbcms/html.cjs`; its tests run both on the same inputs and check that the output is the same.
 
 ## Development
 

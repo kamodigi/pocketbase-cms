@@ -101,5 +101,9 @@
 	"form_error_date_min": "Choose {date} or later.",
 	"form_error_date_max": "Choose {date} or earlier.",
 	"form_error_option": "Choose one of the options.",
-	"form_error_max_select": "Choose up to {max}."
+	"form_error_max_select": "Choose up to {max}.",
+	"preview_button": "Preview on site",
+	"preview_unsaved": "The preview does not show unsaved changes.",
+	"preview_error": "Could not open the preview: {message}",
+	"preview_error_blocked": "The browser blocked the new tab. Allow pop-ups for this page, then try again."
 }

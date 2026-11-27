@@ -101,5 +101,9 @@
 	"form_error_date_min": "{date}以降を選んでください。",
 	"form_error_date_max": "{date}以前を選んでください。",
 	"form_error_option": "選択肢から選んでください。",
-	"form_error_max_select": "{max}個まで選べます。"
+	"form_error_max_select": "{max}個まで選べます。",
+	"preview_button": "サイトで確認",
+	"preview_unsaved": "保存していない変更はプレビューに反映されません。",
+	"preview_error": "プレビューを開けませんでした：{message}",
+	"preview_error_blocked": "ブラウザが新しいタブをブロックしました。このページのポップアップを許可してから、もう一度お試しください。"
 }

@@ -89,6 +89,39 @@ afterEach(() => {
 })
 
 describe('RecordForm', () => {
+	it('offers a preview on the site only for a saved record of a collection with a previewUrl', async () => {
+		const withPreview: CmsConfig = {
+			...config,
+			collections: {
+				...config.collections,
+				posts: { ...config.collections.posts, previewUrl: 'https://example.com/news/preview' },
+			},
+		}
+		const props = { collection: 'posts', label: 'Posts', schema, uiLocale: 'en' }
+		const button = () => screen.queryByRole('button', { name: 'Preview on site' })
+
+		const withoutUrl = show({ record })
+		expect(button()).not.toBeInTheDocument()
+		withoutUrl.unmount()
+
+		const unsaved = render(RecordForm, { ...props, config: withPreview })
+		expect(button()).not.toBeInTheDocument()
+		unsaved.unmount()
+
+		const user = userEvent.setup()
+		// eslint-disable-next-line unicorn/no-null -- what window.open answers when blocked
+		const open = vi.spyOn(globalThis, 'open').mockReturnValue(null)
+		render(RecordForm, { ...props, config: withPreview, record })
+		expect(screen.queryByRole('status')).not.toBeInTheDocument()
+		await user.type(screen.getByRole('textbox', { name: /^Title/ }), '!')
+		expect(screen.getByRole('status')).toHaveTextContent('The preview does not show unsaved changes.')
+
+		await user.click(button()!)
+		expect(open).toHaveBeenCalled()
+		expect(toasts.error).toHaveBeenCalledWith(expect.stringContaining('blocked the new tab'))
+		open.mockRestore()
+	})
+
 	it('checks the inputs before creating, and shows what is wrong', async () => {
 		const user = userEvent.setup()
 		const fetch = serve(200, {})
